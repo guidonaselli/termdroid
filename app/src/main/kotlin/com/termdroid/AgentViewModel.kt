@@ -13,6 +13,8 @@ import com.termdroid.core.SecretStore
 import com.termdroid.exec.ExecEnvironment
 import com.termdroid.probe.CapabilityProbe
 import com.termdroid.probe.DeviceCapabilities
+import com.termdroid.tools.android.AndroidToolset
+import com.termdroid.tools.android.SpecialAccess
 import com.termdroid.tools.unix.UnixToolset
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
@@ -50,6 +52,7 @@ data class ChatState(
     val busy: Boolean = false,
     val autonomy: AutonomyMode = AutonomyMode.AUTO_READ,
     val pending: PendingApproval? = null,
+    val accessNeeded: SpecialAccess? = null,
     val needsApiKey: Boolean = true,
     val caps: DeviceCapabilities? = null,
     val tokensIn: Long = 0,
@@ -86,6 +89,8 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(needsApiKey = false) }
     }
 
+    fun dismissAccessPrompt() = _state.update { it.copy(accessNeeded = null) }
+
     fun setAutonomy(mode: AutonomyMode) {
         loop?.autonomy = mode
         _state.update { it.copy(autonomy = mode) }
@@ -94,7 +99,10 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
     private fun buildLoop(caps: DeviceCapabilities) {
         val key = secrets.apiKey ?: return
         val env = ExecEnvironment(getApplication())
-        val tools = UnixToolset(env, caps.backend, workspace).all()
+        val tools = UnixToolset(env, caps.backend, workspace).all() +
+            AndroidToolset(getApplication()) { access ->
+                _state.update { it.copy(accessNeeded = access) }
+            }.all()
 
         loop = AgentLoop(
             transport = ClaudeTransport(key),
@@ -120,6 +128,9 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
         appendLine("Entorno:")
         appendLine("- El shell es el que trae Android (toybox), no GNU. No asumas banderas de coreutils.")
         appendLine("- Trabajas dentro de un workspace; no podes leer ni escribir fuera de el.")
+        appendLine("- Tenes tools para consultar el propio Android: apps instaladas, tiempo de uso")
+        appendLine("  por app y estado del telefono. Si uno devuelve que falta un permiso, decilo y")
+        appendLine("  segui; la app ya le ofrecio al usuario concederlo.")
         if (!caps.canInstallPackages) {
             appendLine("- Este device no puede instalar paquetes nuevos: usa solo lo que ya esta.")
         }

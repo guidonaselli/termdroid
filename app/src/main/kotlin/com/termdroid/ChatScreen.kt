@@ -79,6 +79,10 @@ fun ChatScreen(vm: AgentViewModel, modifier: Modifier = Modifier) {
             items(state.items, key = { it.id }) { item -> ChatBubble(item) }
         }
 
+        state.accessNeeded?.let { access ->
+            AccessCard(access = access, onDismiss = vm::dismissAccessPrompt)
+        }
+
         state.pending?.let { pending ->
             ApprovalCard(pending = pending, onDecide = vm::approve)
         }
@@ -201,6 +205,34 @@ private fun ToolCardView(card: ChatItem.ToolCard) {
                 if (!open && lines > 3) {
                     Text("… $lines lineas", style = MaterialTheme.typography.labelSmall)
                 }
+            }
+        }
+    }
+}
+
+/** Ofrece conceder un acceso especial en el momento en que hace falta. */
+@Composable
+private fun AccessCard(
+    access: com.termdroid.tools.android.SpecialAccess,
+    onDismiss: () -> Unit,
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    Surface(color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Falta un permiso: ${access.label}", fontWeight = FontWeight.Bold)
+            Text(
+                "Android lo concede desde Ajustes. Sin el, esa consulta no esta disponible; " +
+                    "el resto sigue funcionando.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = {
+                    context.startActivity(
+                        access.settingsIntent().addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                    onDismiss()
+                }) { Text("Abrir Ajustes") }
+                OutlinedButton(onClick = onDismiss) { Text("Ahora no") }
             }
         }
     }
