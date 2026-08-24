@@ -28,6 +28,7 @@ import java.util.concurrent.TimeUnit
 /** Acceso especial que Android concede desde Ajustes, no con un dialogo. */
 enum class SpecialAccess(val label: String) {
     USAGE_STATS("Acceso al uso de apps"),
+    NOTIFICATIONS("Acceso a las notificaciones"),
     ;
 
     fun isGranted(context: Context): Boolean = when (this) {
@@ -40,10 +41,13 @@ enum class SpecialAccess(val label: String) {
             )
             mode == AppOpsManager.MODE_ALLOWED
         }
+
+        NOTIFICATIONS -> NotificationLog.isEnabled(context)
     }
 
     fun settingsIntent(): Intent = when (this) {
         USAGE_STATS -> Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
+        NOTIFICATIONS -> Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
     }
 }
 
@@ -52,7 +56,12 @@ class AndroidToolset(
     private val context: Context,
     private val onAccessNeeded: (SpecialAccess) -> Unit = {},
 ) {
-    fun all(): List<AgentTool> = listOf(ListAppsTool(), AppUsageTool(), DeviceStateTool())
+    init {
+        NotificationLog.attach(context)
+    }
+
+    fun all(): List<AgentTool> =
+        listOf(ListAppsTool(), AppUsageTool(), DeviceStateTool(), NotificationsTool())
 
     private fun requireAccess(access: SpecialAccess): ToolOutcome? {
         if (access.isGranted(context)) return null
@@ -152,6 +161,54 @@ class AndroidToolset(
                         .toString(2),
                 )
             }.getOrElse { ToolOutcome("No se pudo leer el uso: $it", isError = true) }
+        }
+    }
+
+    private inner class NotificationsTool : AgentTool {
+        override val spec = ToolSpec(
+            name = "notifications",
+            description = "Notificaciones recientes que llegaron al telefono, de la mas nueva a la mas vieja.",
+            inputSchema = objectSchema(
+                "limit" to intProp("Cuantas devolver. Por defecto 20."),
+                "package_filter" to stringProp("Filtra por nombre de paquete."),
+                required = emptyList(),
+            ),
+        )
+        override val risk = ToolRisk.READ
+
+        override fun describe(input: JSONObject) = "leer notificaciones recientes"
+
+        override suspend fun execute(input: JSONObject): ToolOutcome = withContext(Dispatchers.IO) {
+            requireAccess(SpecialAccess.NOTIFICATIONS)?.let { return@withContext it }
+
+            val limit = input.optInt("limit", 20).coerceIn(1, 200)
+            val filtro = input.optString("package_filter").takeIf { it.isNotBlank() }
+            val recientes = NotificationLog.recent(limit, filtro)
+
+            if (recientes.isEmpty()) {
+                return@withContext ToolOutcome(
+                    "No hay notificaciones registradas todavia. Solo se ven las que llegan " +
+                        "desde que se concedio el permiso.",
+                )
+            }
+
+            ToolOutcome(
+                JSONObject()
+                    .put("total", recientes.size)
+                    .put(
+                        "notifications",
+                        JSONArray(
+                            recientes.map {
+                                JSONObject()
+                                    .put("package", it.packageName)
+                                    .put("title", it.title)
+                                    .put("text", it.text)
+                                    .put("posted_at", it.postedAt)
+                            },
+                        ),
+                    )
+                    .toString(2),
+            )
         }
     }
 
