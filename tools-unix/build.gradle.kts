@@ -8,6 +8,13 @@ android {
 
     defaultConfig {
         minSdk = 26
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 
     compileOptions {
@@ -16,8 +23,15 @@ android {
     }
 }
 
-
 dependencies {
     implementation(libs.androidx.core.ktx)
-    implementation(project(":exec"))
+    implementation(libs.kotlinx.coroutines.android)
+    api(project(":exec"))
+    api(project(":agent"))
+
+    testImplementation(libs.junit)
+    testImplementation(libs.org.json)
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.kotlinx.coroutines.test)
 }

@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Unico permiso que la app declara al instalar. Todo lo demas se pide
+         just-in-time, cuando un tool lo necesita. Ver 10_TECH/ONBOARDING.md. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
         android:allowBackup="false"
         android:label="Termdroid"
