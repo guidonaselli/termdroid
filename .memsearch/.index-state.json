@@ -1,16 +1,16 @@
 {
   "collection": "ms_termdroid_0fd01eae",
   "failed_files": [],
-  "last_completed_at": "2026-08-24T17:03:39.384507Z",
+  "last_completed_at": "2026-08-24T18:21:29.287583Z",
   "last_error": "MilvusException: <MilvusException: (code=2, message=Fail connecting to server on localhost:19530, illegal connection params or server unavailable)>",
-  "last_failed_at": "2026-08-24T17:03:39.384507Z",
-  "last_started_at": "2026-08-24T17:03:35.471889Z",
+  "last_failed_at": "2026-08-24T18:21:29.287583Z",
+  "last_started_at": "2026-08-24T18:21:23.041146Z",
   "milvus_uri": "http://localhost:19530",
-  "operation": "index",
+  "operation": "watch",
   "paths": [
     "D:/IT/Projects/Termdroid/.memsearch/memory"
   ],
   "schema_version": 1,
   "status": "error",
-  "updated_at": "2026-08-24T17:03:39.384507Z"
+  "updated_at": "2026-08-24T18:21:29.287583Z"
 }
