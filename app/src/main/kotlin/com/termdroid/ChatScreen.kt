@@ -26,6 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -65,6 +66,7 @@ fun ChatScreen(vm: AgentViewModel, modifier: Modifier = Modifier) {
         AutonomyBar(
             mode = state.autonomy,
             onMode = vm::setAutonomy,
+            onNueva = vm::nuevaSesion,
             tokensIn = state.tokensIn,
             tokensOut = state.tokensOut,
             cacheRead = state.cacheRead,
@@ -263,6 +265,7 @@ private fun ApprovalCard(pending: PendingApproval, onDecide: (Boolean) -> Unit) 
 private fun AutonomyBar(
     mode: AutonomyMode,
     onMode: (AutonomyMode) -> Unit,
+    onNueva: () -> Unit,
     tokensIn: Long,
     tokensOut: Long,
     cacheRead: Long,
@@ -284,6 +287,7 @@ private fun AutonomyBar(
                     label = { Text(m.label(), fontSize = 12.sp) },
                 )
             }
+            TextButton(onClick = onNueva) { Text("Nueva", fontSize = 12.sp) }
         }
         Text(
             "in $tokensIn · out $tokensOut · cache $cacheRead",

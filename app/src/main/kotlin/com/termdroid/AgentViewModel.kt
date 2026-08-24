@@ -8,6 +8,12 @@ import com.termdroid.agent.AgentLoop
 import com.termdroid.agent.AutonomyMode
 import com.termdroid.agent.Block
 import com.termdroid.agent.ClaudeTransport
+import com.termdroid.agent.MessageCodec
+import com.termdroid.agent.Msg
+import com.termdroid.agent.Role
+import com.termdroid.agent.SessionMeta
+import com.termdroid.agent.SessionStore
+import com.termdroid.agent.StoredSession
 import com.termdroid.agent.ToolRegistry
 import com.termdroid.core.SecretStore
 import com.termdroid.exec.ExecEnvironment
@@ -64,6 +70,9 @@ data class ChatState(
 class AgentViewModel(app: Application) : AndroidViewModel(app) {
 
     private val secrets = SecretStore(app)
+    private val sessions = SessionStore(File(app.filesDir, "sessions"))
+    private var sessionId: String = ""
+
     private val _state = MutableStateFlow(ChatState())
     val state: StateFlow<ChatState> = _state
 
@@ -80,12 +89,85 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
         val caps = CapabilityProbe(app).get()
         _state.update { it.copy(caps = caps, needsApiKey = !secrets.has(API_KEY)) }
         if (secrets.has(API_KEY)) buildLoop(caps)
+        restoreLastSession()
+    }
+
+    private fun restoreLastSession() {
+        val last = sessions.list().firstOrNull()
+        if (last == null) {
+            sessionId = newSessionId()
+            return
+        }
+        val stored = sessions.load(last.id) ?: run {
+            sessionId = newSessionId()
+            return
+        }
+        sessionId = stored.meta.id
+        loop?.restore(stored.messages)
+        _state.update {
+            it.copy(
+                items = stored.messages.flatMap(::itemsOf),
+                tokensIn = stored.meta.tokensIn,
+                tokensOut = stored.meta.tokensOut,
+                cacheRead = stored.meta.cacheRead,
+            )
+        }
+    }
+
+    private fun itemsOf(msg: Msg): List<ChatItem> = msg.blocks.mapNotNull { block ->
+        when (block) {
+            is Block.Text ->
+                if (msg.role == Role.USER) ChatItem.User(nextId++, block.text)
+                else ChatItem.Assistant(nextId++, block.text)
+
+            is Block.Thinking -> ChatItem.Thinking(nextId++, block.text)
+
+            is Block.ToolUse -> ChatItem.ToolCard(
+                id = nextId++,
+                toolUseId = block.id,
+                name = block.name,
+                description = block.input.toString(),
+                status = ToolStatus.LISTO,
+            )
+
+            is Block.ToolResult -> null
+            is Block.Opaque -> null
+        }
+    }
+
+    private fun newSessionId(): String = "s-" + System.currentTimeMillis()
+
+    private fun persist() {
+        val l = loop ?: return
+        val s = _state.value
+        val titulo = s.items.filterIsInstance<ChatItem.User>().firstOrNull()?.text?.take(60).orEmpty()
+        sessions.save(
+            StoredSession(
+                meta = SessionMeta(
+                    id = sessionId.ifBlank { newSessionId().also { sessionId = it } },
+                    title = titulo,
+                    updatedAt = System.currentTimeMillis(),
+                    tokensIn = s.tokensIn,
+                    tokensOut = s.tokensOut,
+                    cacheRead = s.cacheRead,
+                ),
+                messages = l.messages,
+            ),
+        )
+    }
+
+    fun nuevaSesion() {
+        persist()
+        sessionId = newSessionId()
+        loop?.restore(emptyList())
+        _state.update { it.copy(items = emptyList(), tokensIn = 0, tokensOut = 0, cacheRead = 0) }
     }
 
     fun saveApiKey(key: String) {
         secrets.apiKey = key.trim()
         val caps = _state.value.caps ?: return
         buildLoop(caps)
+        sessions.load(sessionId)?.let { loop?.restore(it.messages) }
         _state.update { it.copy(needsApiKey = false) }
     }
 
@@ -239,6 +321,7 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
             _state.update { it.copy(busy = false) }
+            persist()
         }
     }
 
