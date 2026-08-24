@@ -129,7 +129,7 @@ fun ChatScreen(vm: AgentViewModel, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun ChatBubble(item: ChatItem) {
+internal fun ChatBubble(item: ChatItem) {
     when (item) {
         is ChatItem.User -> Surface(
             color = MaterialTheme.colorScheme.primaryContainer,
@@ -176,7 +176,7 @@ private fun ChatBubble(item: ChatItem) {
 
 /** Un tool call es un componente, no texto plano. */
 @Composable
-private fun ToolCardView(card: ChatItem.ToolCard) {
+internal fun ToolCardView(card: ChatItem.ToolCard) {
     var open by remember { mutableStateOf(false) }
     val (label, color) = when (card.status) {
         ToolStatus.PENDIENTE -> "…" to MaterialTheme.colorScheme.surfaceVariant
@@ -249,7 +249,7 @@ private fun AccessCard(
 
 /** La aprobacion muestra la accion exacta, nunca un resumen del modelo. */
 @Composable
-private fun ApprovalCard(pending: PendingApproval, onDecide: (Boolean) -> Unit) {
+internal fun ApprovalCard(pending: PendingApproval, onDecide: (Boolean) -> Unit) {
     Surface(color = MaterialTheme.colorScheme.tertiaryContainer, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("El agente quiere ejecutar ${pending.name}", fontWeight = FontWeight.Bold)
