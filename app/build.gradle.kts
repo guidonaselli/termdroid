@@ -65,6 +65,7 @@ dependencies {
     implementation(project(":terminal"))
     implementation(project(":rootfs"))
 
+    implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)

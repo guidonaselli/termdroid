@@ -17,6 +17,10 @@
 #include <termios.h>
 #include <unistd.h>
 
+// Cuanto se espera a que el hijo muera solo antes de forzarlo.
+#define REAP_TRIES 20
+#define REAP_SLEEP_US 10000
+
 // Devuelve el fd del master en el int[0] y el pid del hijo en el int[1].
 JNIEXPORT jintArray JNICALL
 Java_com_termdroid_exec_NativePty_open(JNIEnv *env, jclass clazz,
@@ -137,5 +141,21 @@ Java_com_termdroid_exec_NativePty_close(JNIEnv *env, jclass clazz, jint fd, jint
     (void) env;
     (void) clazz;
     if (fd >= 0) close(fd);
-    if (pid > 0) kill((pid_t) pid, SIGHUP);
+    if (pid <= 0) return;
+
+    // Matar no alcanza: hay que cosechar al hijo o queda como zombie. Cada
+    // sesion cerrada y cada corrida del probe dejaban una entrada muerta en la
+    // tabla de procesos de la app.
+    kill((pid_t) pid, SIGHUP);
+
+    for (int i = 0; i < REAP_TRIES; i++) {
+        int status = 0;
+        pid_t r = waitpid((pid_t) pid, &status, WNOHANG);
+        if (r == (pid_t) pid || (r < 0 && errno == ECHILD)) return;
+        usleep(REAP_SLEEP_US);
+    }
+
+    // No se fue por las buenas.
+    kill((pid_t) pid, SIGKILL);
+    waitpid((pid_t) pid, NULL, 0);
 }
