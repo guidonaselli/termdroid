@@ -1,6 +1,10 @@
 package com.termdroid
 
 import android.app.Application
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.termdroid.agent.AgentEvent
@@ -59,6 +63,7 @@ data class ChatState(
     val autonomy: AutonomyMode = AutonomyMode.AUTO_READ,
     val pending: PendingApproval? = null,
     val accessNeeded: SpecialAccess? = null,
+    val prefill: String? = null,
     val needsApiKey: Boolean = true,
     val caps: DeviceCapabilities? = null,
     val tokensIn: Long = 0,
@@ -85,11 +90,20 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
     private val workspace: File =
         File(app.filesDir, "workspace").apply { mkdirs() }
 
+    private val cancelReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) = cancel()
+    }
+
     init {
         val caps = CapabilityProbe(app).get()
         _state.update { it.copy(caps = caps, needsApiKey = !secrets.has(API_KEY)) }
         if (secrets.has(API_KEY)) buildLoop(caps)
         restoreLastSession()
+        app.registerReceiver(
+            cancelReceiver,
+            IntentFilter(AgentService.ACTION_CANCEL_REQUESTED),
+            Context.RECEIVER_NOT_EXPORTED,
+        )
     }
 
     private fun restoreLastSession() {
@@ -173,6 +187,10 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
 
     fun dismissAccessPrompt() = _state.update { it.copy(accessNeeded = null) }
 
+    fun prefill(text: String) = _state.update { it.copy(prefill = text) }
+
+    fun clearPrefill() = _state.update { it.copy(prefill = null) }
+
     fun setAutonomy(mode: AutonomyMode) {
         loop?.autonomy = mode
         _state.update { it.copy(autonomy = mode) }
@@ -234,6 +252,7 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
         approval?.complete(false)
         approval = null
         _state.update { it.copy(busy = false, pending = null) }
+        AgentService.listo(getApplication())
         add(ChatItem.Note(nextId++, "Cancelado."))
     }
 
@@ -243,6 +262,7 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
 
         add(ChatItem.User(nextId++, text))
         _state.update { it.copy(busy = true) }
+        AgentService.trabajando(getApplication(), text.take(60))
 
         runJob = viewModelScope.launch {
             var assistantId = -1L
@@ -321,8 +341,15 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
             _state.update { it.copy(busy = false) }
+            AgentService.listo(getApplication())
             persist()
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        runCatching { getApplication<Application>().unregisterReceiver(cancelReceiver) }
+        AgentService.listo(getApplication())
     }
 
     private fun add(item: ChatItem) = _state.update { it.copy(items = it.items + item) }

@@ -33,6 +33,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        sharedTextOf(intent)?.let(agent::prefill)
 
         setContent {
             TermdroidTheme {
@@ -54,6 +55,12 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        sharedTextOf(intent)?.let(agent::prefill)
+    }
+
 }
 
 @Composable

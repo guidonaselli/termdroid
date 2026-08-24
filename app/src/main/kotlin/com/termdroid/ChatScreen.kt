@@ -52,6 +52,13 @@ fun ChatScreen(vm: AgentViewModel, modifier: Modifier = Modifier) {
     var input by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
+    LaunchedEffect(state.prefill) {
+        state.prefill?.let {
+            input = it
+            vm.clearPrefill()
+        }
+    }
+
     LaunchedEffect(state.items.size) {
         if (state.items.isNotEmpty()) listState.animateScrollToItem(state.items.lastIndex)
     }
