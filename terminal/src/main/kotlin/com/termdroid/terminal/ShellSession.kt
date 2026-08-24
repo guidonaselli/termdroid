@@ -110,10 +110,12 @@ class ShellSession(
         cursorRow = buffer.cursorRow,
         cursorCol = buffer.cursorCol,
         title = parser.title,
+        scrollback = buffer.scrollbackLines.takeLast(SCROLLBACK_VISIBLE),
     )
 
     private companion object {
         const val SYSTEM_SH = "/system/bin/sh"
+        const val SCROLLBACK_VISIBLE = 500
     }
 }
 
@@ -125,9 +127,21 @@ class ScreenSnapshot(
     val cursorRow: Int,
     val cursorCol: Int,
     val title: String?,
+    val scrollback: List<Array<Cell>> = emptyList(),
 ) {
+    val totalRows: Int get() = scrollback.size + rows
+
+    /** Fila [i] contando el scrollback desde arriba. */
+    fun rowAt(i: Int): Array<Cell> =
+        if (i < scrollback.size) scrollback[i] else cells[i - scrollback.size]
+
     fun text(): String = (0 until rows)
         .joinToString("\n") { r -> String(CharArray(cols) { cells[r][it].char }).trimEnd() }
+        .trimEnd('\n')
+
+    /** Todo lo que se vio, scrollback incluido. */
+    fun fullText(): String = (0 until totalRows)
+        .joinToString("\n") { i -> rowAt(i).let { row -> String(CharArray(row.size) { row[it].char }) }.trimEnd() }
         .trimEnd('\n')
 
     companion object {

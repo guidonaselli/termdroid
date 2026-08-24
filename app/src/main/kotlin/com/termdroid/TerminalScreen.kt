@@ -42,6 +42,7 @@ import kotlinx.coroutines.launch
 /** Pantalla de terminal. */
 @Composable
 fun TerminalScreen(session: ShellSession, modifier: Modifier = Modifier) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val screen by session.screen.collectAsState()
     val alive by session.alive.collectAsState()
     val scope = rememberCoroutineScope()
@@ -77,6 +78,12 @@ fun TerminalScreen(session: ShellSession, modifier: Modifier = Modifier) {
 
         KeyRow(
             onKey = { seq -> scope.launch { session.send(seq) } },
+            onCopiar = {
+                val cb = context.getSystemService(android.content.ClipboardManager::class.java)
+                cb?.setPrimaryClip(
+                    android.content.ClipData.newPlainText("terminal", screen.fullText()),
+                )
+            },
         )
 
         TextField(
@@ -104,7 +111,7 @@ fun TerminalScreen(session: ShellSession, modifier: Modifier = Modifier) {
 
 /** Barra de teclas contextual. */
 @Composable
-private fun KeyRow(onKey: (String) -> Unit) {
+private fun KeyRow(onKey: (String) -> Unit, onCopiar: () -> Unit) {
     val keys = listOf(
         "Esc" to "\u001B",
         "Tab" to "\t",
@@ -132,6 +139,9 @@ private fun KeyRow(onKey: (String) -> Unit) {
             TextButton(onClick = { onKey(seq) }) {
                 Text(label, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
             }
+        }
+        TextButton(onClick = onCopiar) {
+            Text("Copiar", fontFamily = FontFamily.Monospace, fontSize = 13.sp)
         }
     }
 }

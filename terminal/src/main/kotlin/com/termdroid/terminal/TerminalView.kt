@@ -5,6 +5,18 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -93,27 +105,46 @@ fun TerminalView(
     val measurer = rememberTextMeasurer()
     val baseStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = fontSize)
 
-    // Ancho de celda medido una vez: en monoespaciada todas miden igual.
     val metrics = measurer.measure(AnnotatedString("M"), baseStyle)
     val cellW = metrics.size.width.toFloat()
     val cellH = metrics.size.height.toFloat()
 
-    Box(
+    val scroll = rememberScrollState()
+    val density = LocalDensity.current
+
+    // Se sigue el final salvo que el usuario haya subido a leer.
+    val pegadoAlFondo by remember {
+        derivedStateOf { scroll.value >= scroll.maxValue - 2 }
+    }
+    var seguirElFondo by remember { mutableStateOf(true) }
+
+    LaunchedEffect(pegadoAlFondo) { seguirElFondo = pegadoAlFondo }
+
+    LaunchedEffect(screen.totalRows, scroll.maxValue) {
+        if (seguirElFondo) scroll.scrollTo(scroll.maxValue)
+    }
+
+    BoxWithConstraints(
         modifier = modifier
             .background(palette.background)
             .padding(4.dp),
     ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            if (cellW <= 0f || cellH <= 0f) return@Canvas
+        if (cellW > 0f && cellH > 0f) {
+            with(density) {
+                onGridSize(
+                    (maxHeight.toPx() / cellH).toInt().coerceIn(4, 200),
+                    (maxWidth.toPx() / cellW).toInt().coerceIn(20, 400),
+                )
+            }
+        }
 
-            // La grilla sale de la celda MEDIDA, no de una estimacion: si el
-            onGridSize(
-                (size.height / cellH).toInt().coerceIn(4, 200),
-                (size.width / cellW).toInt().coerceIn(20, 400),
-            )
+        val alto = with(density) { (screen.totalRows.coerceAtLeast(1) * cellH).toDp() }
 
-            if (screen.rows == 0) return@Canvas
-            drawScreen(screen, palette, baseStyle, cellW, cellH, measurer)
+        Box(Modifier.verticalScroll(scroll)) {
+            Canvas(modifier = Modifier.fillMaxWidth().height(alto)) {
+                if (cellW <= 0f || screen.totalRows == 0) return@Canvas
+                drawScreen(screen, palette, baseStyle, cellW, cellH, measurer)
+            }
         }
     }
 }
@@ -126,10 +157,11 @@ private fun DrawScope.drawScreen(
     cellH: Float,
     measurer: androidx.compose.ui.text.TextMeasurer,
 ) {
-    for (r in 0 until screen.rows) {
+    for (r in 0 until screen.totalRows) {
+        val fila = screen.rowAt(r)
         var c = 0
-        while (c < screen.cols) {
-            val cell = screen.cells[r][c]
+        while (c < fila.size) {
+            val cell = fila[c]
             val style = cell.style
 
             var fg = palette.resolve(style.fg, palette.foreground)
@@ -141,8 +173,8 @@ private fun DrawScope.drawScreen(
             // Agrupa celdas contiguas con el mismo estilo: dibujar caracter por
             val start = c
             val sb = StringBuilder()
-            while (c < screen.cols && screen.cells[r][c].style == style) {
-                sb.append(screen.cells[r][c].char)
+            while (c < fila.size && fila[c].style == style) {
+                sb.append(fila[c].char)
                 c++
             }
 
@@ -176,7 +208,10 @@ private fun DrawScope.drawScreen(
     if (screen.cursorRow in 0 until screen.rows) {
         drawRect(
             color = palette.cursor.copy(alpha = 0.6f),
-            topLeft = Offset(screen.cursorCol * cellW, screen.cursorRow * cellH),
+            topLeft = Offset(
+                screen.cursorCol * cellW,
+                (screen.scrollback.size + screen.cursorRow) * cellH,
+            ),
             size = Size(cellW, cellH),
         )
     }
