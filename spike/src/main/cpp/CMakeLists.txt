@@ -8,6 +8,10 @@ set(CMAKE_C_STANDARD 11)
 add_library(tdexec SHARED tdexec.c)
 target_link_libraries(tdexec log)
 
+# --- PTY ----------------------------------------------------------------
+add_library(tdpty SHARED tdpty.c)
+target_link_libraries(tdpty log)
+
 # --- Binario de prueba --------------------------------------------------
 # Es un EJECUTABLE, no una libreria, pero se nombra lib*.so para que el
 # packager del APK lo extraiga a nativeLibraryDir. Ese naming es la

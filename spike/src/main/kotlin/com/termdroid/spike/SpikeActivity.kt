@@ -41,6 +41,7 @@ class SpikeActivity : ComponentActivity() {
 private fun SpikeScreen() {
     val ctx = LocalContext.current
     val exp = remember { ExecExperiments(ctx) }
+    val pty = remember { PtyExperiments(ctx) }
     var output by remember { mutableStateOf(exp.deviceInfo()) }
 
     fun show(label: String, body: () -> String) {
@@ -48,6 +49,18 @@ private fun SpikeScreen() {
         output = "=== $label ===\n$text"
         // logcat para poder capturar el resultado sin leer la pantalla
         Log.i(TAG, "=== $label ===\n$text")
+    }
+
+    // Corre la bateria completa al abrir: el resultado queda en logcat y se puede
+    // capturar sin tocar la pantalla (emulador headless, CI, device por adb).
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val exec = runCatching { exp.runAll() }.getOrElse { "EXCEPCION: $it" }
+            Log.i(TAG, "=== exec ===\n$exec")
+            val ptyOut = runCatching { pty.runAll() }.getOrElse { "EXCEPCION: $it" }
+            Log.i(TAG, "=== pty ===\n$ptyOut")
+            output = exec + "\n" + ptyOut
+        }
     }
 
     Scaffold(modifier = Modifier.fillMaxSize()) { inner ->
@@ -74,6 +87,9 @@ private fun SpikeScreen() {
             }
             Button(onClick = { show("nivel 2") { exp.level2() } }, modifier = Modifier.fillMaxWidth()) {
                 Text("Nivel 2 - linker explicito")
+            }
+            Button(onClick = { show("pty") { pty.runAll() } }, modifier = Modifier.fillMaxWidth()) {
+                Text("PTY y shebangs")
             }
 
             Text(
