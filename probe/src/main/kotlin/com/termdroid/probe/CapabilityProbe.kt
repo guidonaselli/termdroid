@@ -12,14 +12,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
-/**
- * Mide que puede hacer este device y elige el backend de ejecucion.
- *
- * Existe porque el comportamiento de SELinux, del linker y de los gestores de
- * bateria varia por version y por fabricante mas de lo que se puede predecir
- * desde el codigo. Detectar convierte la compatibilidad en un mecanismo
- * verificable en vez de una apuesta. Ver 10_TECH/COMPATIBILITY.md.
- */
+/** Mide que puede hacer este device y elige el backend de ejecucion. */
 class CapabilityProbe(private val context: Context) {
 
     private val env = ExecEnvironment(context)
@@ -38,7 +31,6 @@ class CapabilityProbe(private val context: Context) {
             tryExec(ExecBackend.DIRECT, packaged, "nativelibdir", failures)
 
         // Sin binario en filesDir no se pueden medir los niveles 0 ni 2, pero eso
-        // no invalida el nivel 1: la app sigue siendo usable.
         val directExec = staged != null && tryExec(ExecBackend.DIRECT, staged, "directo", failures)
         val linkerExec = staged != null && env.linker.exists() &&
             tryExec(ExecBackend.LINKER, staged, "linker", failures)
@@ -59,7 +51,6 @@ class CapabilityProbe(private val context: Context) {
             linkerExec = linkerExec,
             pty = pty,
             // La depuracion inalambrica, que es lo que permite el canal UID shell
-            // sin una PC, llego en Android 11.
             wirelessDebuggingPossible = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R,
             abi = Build.SUPPORTED_ABIS.firstOrNull().orEmpty(),
             sdkInt = Build.VERSION.SDK_INT,
@@ -144,9 +135,6 @@ class CapabilityProbe(private val context: Context) {
     }
 
     // --- cache -----------------------------------------------------------
-    // La clave incluye la version de la app y el fingerprint del sistema: un
-    // update de cualquiera de los dos puede cambiar el resultado, y un resultado
-    // viejo es peor que no tener ninguno.
 
     private fun prefs() = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 

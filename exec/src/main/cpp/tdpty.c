@@ -1,10 +1,3 @@
-// PTY para el spike de F-001 (S3).
-//
-// Un shell util necesita una terminal de verdad, no un pipe: sin tty no hay
-// control de trabajos, ni edicion de linea, ni programas de pantalla completa
-// (vim, htop). forkpty() de bionic da eso.
-//
-// Ver 10_TECH/EXEC_MODEL.md, seccion PTY.
 
 #include <jni.h>
 #include <errno.h>
@@ -143,9 +136,7 @@ Java_com_termdroid_exec_NativePty_close(JNIEnv *env, jclass clazz, jint fd, jint
     if (fd >= 0) close(fd);
     if (pid <= 0) return;
 
-    // Matar no alcanza: hay que cosechar al hijo o queda como zombie. Cada
-    // sesion cerrada y cada corrida del probe dejaban una entrada muerta en la
-    // tabla de procesos de la app.
+    // Cosechar al hijo o queda zombie.
     kill((pid_t) pid, SIGHUP);
 
     for (int i = 0; i < REAP_TRIES; i++) {

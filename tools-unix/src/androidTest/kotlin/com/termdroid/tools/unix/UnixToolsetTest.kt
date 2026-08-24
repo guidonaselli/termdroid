@@ -13,12 +13,7 @@ import org.junit.Before
 import org.junit.Test
 import java.io.File
 
-/**
- * Las tools se prueban contra el entorno real del device.
- *
- * Es la unica forma de saber si funcionan sobre toybox, que es lo que va a haber
- * en la mayoria de los casos.
- */
+/** Las tools se prueban contra el entorno real del device. */
 class UnixToolsetTest {
 
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
@@ -107,10 +102,7 @@ class UnixToolsetTest {
         assertTrue(gr.content, gr.content.contains("src/dos.kt:1"))
     }
 
-    /**
-     * Un agente no puede escribir fuera de su workspace, ni siquiera con `../`
-     * o siguiendo un symlink. Ver 10_TECH/SECURITY_MODEL.md.
-     */
+    /** Un agente no puede escribir fuera de su workspace, ni siquiera con `../` o siguiendo un symlink. */
     @Test
     fun noSePuedeEscaparDelWorkspaceConDosPuntos() {
         val r = run("write_file", "path" to "../afuera.txt", "content" to "no")

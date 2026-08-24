@@ -2,11 +2,7 @@ package com.termdroid.agent
 
 import org.json.JSONObject
 
-/**
- * Cuanto puede doler un tool si sale mal.
- *
- * Es lo que decide si hace falta aprobacion humana, no el nombre del tool.
- */
+/** Cuanto puede doler un tool si sale mal. */
 enum class ToolRisk {
     /** Lee. Reversible por definicion. */
     READ,
@@ -41,13 +37,7 @@ interface AgentTool {
     suspend fun execute(input: JSONObject): ToolOutcome
 }
 
-/**
- * El set de tools de una sesion.
- *
- * El orden es estable a proposito: `tools` se renderiza antes que `system` y que
- * `messages`, asi que reordenarlo invalida todo el prefijo cacheado.
- * Ver 10_TECH/AGENT_LOOP.md.
- */
+/** El set de tools de una sesion. */
 class ToolRegistry(tools: List<AgentTool>) {
     private val byName: Map<String, AgentTool> =
         tools.sortedBy { it.spec.name }.associateBy { it.spec.name }
@@ -60,12 +50,7 @@ class ToolRegistry(tools: List<AgentTool>) {
 /** Cuanto decide el agente por su cuenta. */
 enum class AutonomyMode { ASK_ALL, AUTO_READ, AUTO_ALL }
 
-/**
- * Un tool privilegiado nunca se auto-ejecuta, en ningun modo.
- *
- * La defensa real contra prompt injection no es el prompt: es que las acciones
- * peligrosas requieren un toque del usuario. Ver 10_TECH/SECURITY_MODEL.md.
- */
+/** Un tool privilegiado nunca se auto-ejecuta, en ningun modo. */
 fun AutonomyMode.needsApproval(risk: ToolRisk): Boolean = when {
     risk == ToolRisk.PRIVILEGED -> true
     this == AutonomyMode.ASK_ALL -> true

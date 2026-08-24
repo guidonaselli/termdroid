@@ -3,12 +3,7 @@ package com.termdroid.exec
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 
-/**
- * Un proceso corriendo sobre una terminal de verdad.
- *
- * Un pipe no alcanza: sin tty no hay control de trabajos, ni edicion de linea,
- * ni programas de pantalla completa.
- */
+/** Un proceso corriendo sobre una terminal de verdad. */
 class PtySession private constructor(
     private val masterFd: Int,
     val pid: Int,

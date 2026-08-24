@@ -25,28 +25,13 @@ data class ExecResult(val output: String, val exitCode: Int) {
     val ok: Boolean get() = exitCode == 0
 }
 
-/**
- * Traduce "quiero correr esto" al `argv` que este device acepta.
- *
- * Es el equivalente en Kotlin del exec shim: los tres niveles no son caminos de
- * codigo distintos, solo `argv` distintos. Los `execve` que ocurren *dentro* del
- * shell los resuelve el shim nativo con `LD_PRELOAD`; este resuelve los que
- * inicia la app.
- *
- * Ver 10_TECH/EXEC_MODEL.md.
- */
+/** Traduce "quiero correr esto" al `argv` que este device acepta. */
 class Executor(
     private val env: ExecEnvironment,
     private val backend: ExecBackend,
 ) {
 
-    /**
-     * Arma el `argv` final para ejecutar [file].
-     *
-     * Un script con `#!` nunca pasa por el linker: no es ELF. La unica salida es
-     * ejecutar al interprete con el script como argumento, que es lo que hace el
-     * kernel cuando puede.
-     */
+    /** Arma el `argv` final para ejecutar [file]. */
     fun buildArgv(file: File, args: List<String> = emptyList()): List<String> {
         val shebang = readShebang(file)
         if (shebang != null) {
@@ -56,7 +41,6 @@ class Executor(
 
         val underNativeLibDir = file.absolutePath.startsWith(env.nativeLibDir.absolutePath)
         return when {
-            // Ya esta en la unica ruta siempre ejecutable.
             underNativeLibDir -> listOf(file.absolutePath) + args
             backend == ExecBackend.DIRECT -> listOf(file.absolutePath) + args
             backend == ExecBackend.LINKER -> listOf(env.linker.absolutePath, file.absolutePath) + args

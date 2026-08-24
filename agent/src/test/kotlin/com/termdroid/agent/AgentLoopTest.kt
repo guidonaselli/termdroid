@@ -81,10 +81,7 @@ class AgentLoopTest {
         assertTrue(events.last() is AgentEvent.Done)
     }
 
-    /**
-     * La regla que se rompe mas facil y falla en silencio: si los `tool_result`
-     * se reparten entre mensajes, el modelo aprende a no paralelizar mas.
-     */
+    /** La regla que se rompe mas facil y falla en silencio: si los `tool_result` se reparten entre. */
     @Test
     fun losResultadosDeVariosToolsVanEnUnSoloMensaje() = runTest {
         val a = FakeTool("a", ToolRisk.READ)
@@ -195,10 +192,7 @@ class AgentLoopTest {
         assertTrue(events.any { it is AgentEvent.Truncated })
     }
 
-    /**
-     * El prefijo cacheado es `tools` + `system`. Si cualquiera de los dos cambia
-     * entre turnos, se pierde el cache y no hay error que lo avise.
-     */
+    /** El prefijo cacheado es `tools` + `system`. */
     @Test
     fun elSystemYLosToolsSonEstablesEntreTurnos() = runTest {
         val a = FakeTool("zeta", ToolRisk.READ)

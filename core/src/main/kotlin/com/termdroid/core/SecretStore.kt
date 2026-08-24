@@ -10,14 +10,7 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
-/**
- * Guarda la credencial de la API.
- *
- * La clave vive en el Android Keystore y nunca sale de ahi: lo que se persiste
- * es solo el texto cifrado. Sin esto, la credencial quedaria legible para
- * cualquiera con acceso al backup o al almacenamiento de la app.
- * Ver 10_TECH/SECURITY_MODEL.md.
- */
+/** Guarda la credencial de la API. */
 class SecretStore(context: Context) {
 
     private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -26,8 +19,7 @@ class SecretStore(context: Context) {
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, key())
         val encrypted = cipher.doFinal(value.toByteArray())
-        // El IV va junto al texto cifrado: GCM necesita uno distinto por mensaje
-        // y no es secreto.
+        // El IV va junto al texto cifrado.
         val blob = cipher.iv + encrypted
         prefs.edit().putString(name, Base64.encodeToString(blob, Base64.NO_WRAP)).apply()
     }
@@ -40,8 +32,7 @@ class SecretStore(context: Context) {
             cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(TAG_BITS, blob, 0, IV_BYTES))
             String(cipher.doFinal(blob, IV_BYTES, blob.size - IV_BYTES))
         }.getOrElse {
-            // Si la clave del Keystore se invalido, el dato guardado ya no sirve:
-            // borrarlo evita reintentos infinitos contra algo indescifrable.
+            // Dato indescifrable: se borra.
             remove(name)
             null
         }

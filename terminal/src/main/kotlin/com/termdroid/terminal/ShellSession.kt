@@ -14,17 +14,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-/**
- * Un shell corriendo, con su pantalla.
- *
- * Une el PTY con el parser: lo que sale del proceso entra al [TerminalBuffer] y
- * la UI observa [screen].
- *
- * El shell por defecto es el `/system/bin/sh` que trae Android. Eso hace que la
- * app sea util apenas se instala, sin esperar a que baje ningun rootfs: es el
- * requisito de cero friccion. Cuando el rootfs este instalado, [shellPath] pasa
- * a apuntar ahi. Ver 10_TECH/ONBOARDING.md.
- */
+/** Un shell corriendo, con su pantalla. */
 class ShellSession(
     private val context: Context,
     private val backend: ExecBackend,
@@ -33,8 +23,6 @@ class ShellSession(
     private val env = ExecEnvironment(context)
 
     // El buffer lo mutan dos hilos: el lector del PTY y el de UI cuando cambia
-    // el tamano (pasa cada vez que se abre el teclado). Sin serializar, una
-    // resize a mitad de un feed deja la pantalla inconsistente o vacia.
     private val lock = Any()
 
     val buffer = TerminalBuffer(rows = 24, cols = 80)
@@ -105,7 +93,6 @@ class ShellSession(
             snapshot()
         }
         // El ioctl va fuera del lock: no toca el buffer y no conviene sostenerlo
-        // mientras se habla con el kernel.
         pty?.resize(rows, cols)
     }
 
@@ -130,12 +117,7 @@ class ShellSession(
     }
 }
 
-/**
- * Copia inmutable de la pantalla.
- *
- * La UI no lee el buffer directo: el hilo de lectura del PTY lo muta y Compose
- * necesita un valor estable para recomponer sin carreras.
- */
+/** Copia inmutable de la pantalla. */
 class ScreenSnapshot(
     val rows: Int,
     val cols: Int,

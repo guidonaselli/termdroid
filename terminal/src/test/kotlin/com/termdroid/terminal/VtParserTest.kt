@@ -117,10 +117,7 @@ class VtParserTest {
         assertEquals(TermColor.Rgb(10, 20, 30), b.cellAt(0, 1).style.bg)
     }
 
-    /**
-     * El caso que rompe a un parser ingenuo: las secuencias llegan partidas
-     * entre lecturas del PTY.
-     */
+    /** El caso que rompe a un parser ingenuo: las secuencias llegan partidas entre lecturas del PTY. */
     @Test
     fun secuenciaPartidaEntreLecturas() {
         val (b, p) = terminal()
@@ -186,12 +183,7 @@ class VtParserTest {
         assertTrue(b.cursorCol < 10)
     }
 
-    /**
-     * Achicar la pantalla no puede borrar lo que ya estaba.
-     *
-     * Es lo que pasa cada vez que se abre el teclado: si el contenido se pierde,
-     * el usuario ve la terminal vaciarse al ir a escribir.
-     */
+    /** Achicar la pantalla no puede borrar lo que ya estaba. */
     @Test
     fun resizeConservaElTextoQueEntra() {
         val (b, p) = terminal(rows = 10, cols = 40)

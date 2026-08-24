@@ -7,10 +7,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * El probe se verifica en un device, no en la JVM: lo que mide es precisamente
- * comportamiento del sistema que un test unitario no puede reproducir.
- */
+/** El probe se verifica en un device. */
 class CapabilityProbeTest {
 
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext

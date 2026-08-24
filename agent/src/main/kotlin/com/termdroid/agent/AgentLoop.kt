@@ -42,13 +42,7 @@ fun interface ApprovalGate {
     suspend fun approve(call: Block.ToolUse, description: String): Boolean
 }
 
-/**
- * El loop de agente.
- *
- * Se implementa a mano y no con el tool runner del SDK porque la UI necesita
- * intervenir entre la decision del modelo y la ejecucion: sin ese punto no hay
- * aprobaciones ni cancelacion real. Ver 10_TECH/AGENT_LOOP.md.
- */
+/** El loop de agente. */
 class AgentLoop(
     private val transport: Transport,
     private val tools: ToolRegistry,
@@ -115,18 +109,12 @@ class AgentLoop(
 
         val result = finalResult ?: error("el transporte termino sin un resultado final")
 
-        // El contenido del asistente se guarda completo, no solo el texto.
         history.add(Msg.assistant(result.blocks))
         collector.emit(AgentEvent.TurnFinished(result.usage))
         return result
     }
 
-    /**
-     * Ejecuta los tools de un turno y devuelve sus resultados.
-     *
-     * Los `tool_result` de un mismo mensaje van juntos en **un unico** mensaje
-     * user: repartirlos entre mensajes le ensena al modelo a dejar de paralelizar.
-     */
+    /** Ejecuta los tools de un turno y devuelve sus resultados. */
     private suspend fun runTools(
         collector: kotlinx.coroutines.flow.FlowCollector<AgentEvent>,
         calls: List<Block.ToolUse>,
@@ -134,8 +122,6 @@ class AgentLoop(
         val approved = mutableListOf<Block.ToolUse>()
         val results = mutableListOf<Block.ToolResult>()
 
-        // La aprobacion es secuencial: pedirlas todas juntas seria un dialogo
-        // ilegible, y ademas el usuario decide una a una.
         for (call in calls) {
             val tool = tools[call.name]
             if (tool == null) {
@@ -155,8 +141,7 @@ class AgentLoop(
                 collector.emit(AgentEvent.ToolApprovalNeeded(call, description))
                 if (!approvalGate.approve(call, description)) {
                     collector.emit(AgentEvent.ToolRejected(call))
-                    // Un rechazo es informacion para el modelo, no un final: se le
-                    // dice y se lo deja replantear.
+                    // El rechazo vuelve al modelo como resultado.
                     results += Block.ToolResult(
                         call.id,
                         "El usuario rechazo esta accion.",
@@ -168,8 +153,7 @@ class AgentLoop(
             approved += call
         }
 
-        // Los aprobados corren en paralelo: el modelo los pidio juntos porque son
-        // independientes.
+        // Los aprobados corren en paralelo.
         val running = approved.map { call ->
             call to async {
                 val tool = tools[call.name]!!
@@ -199,7 +183,6 @@ fun objectSchema(
     .put("type", "object")
     .put("properties", JSONObject().apply { properties.forEach { put(it.first, it.second) } })
     .put("required", required)
-    // strict lo exige: sin esto el modelo puede inventar campos.
     .put("additionalProperties", false)
 
 fun stringProp(description: String): JSONObject =

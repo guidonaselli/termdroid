@@ -1,10 +1,4 @@
 // PTY para el spike de F-001 (S3).
-//
-// Un shell util necesita una terminal de verdad, no un pipe: sin tty no hay
-// control de trabajos, ni edicion de linea, ni programas de pantalla completa
-// (vim, htop). forkpty() de bionic da eso.
-//
-// Ver 10_TECH/EXEC_MODEL.md, seccion PTY.
 
 #include <jni.h>
 #include <errno.h>

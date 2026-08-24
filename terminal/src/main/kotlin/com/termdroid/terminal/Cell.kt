@@ -1,11 +1,6 @@
 package com.termdroid.terminal
 
-/**
- * Color de una celda.
- *
- * Se guarda el indice de la paleta y no un ARGB: el tema decide como se ve un
- * "rojo" en claro y en oscuro, y el buffer no tiene por que saberlo.
- */
+/** Color de una celda. */
 sealed interface TermColor {
     data object Default : TermColor
 

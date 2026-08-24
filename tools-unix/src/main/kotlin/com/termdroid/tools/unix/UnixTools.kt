@@ -15,13 +15,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
 
-/**
- * Las tools de filesystem y shell.
- *
- * Funcionan tanto sobre el toybox que trae Android como sobre el rootfs cuando
- * este instalado, asi que no pueden asumir GNU: nada de `--color`, `-printf` ni
- * banderas largas que toybox no tiene. Ver 10_TECH/ARCHITECTURE.md.
- */
+/** Las tools de filesystem y shell. */
 class UnixToolset(
     private val env: ExecEnvironment,
     private val backend: ExecBackend,
@@ -41,12 +35,7 @@ class UnixToolset(
 
     // --- limites -----------------------------------------------------------
 
-    /**
-     * Resuelve una ruta y falla si se sale del workspace.
-     *
-     * Se compara la ruta **canonica** para que `../` y los symlinks no sirvan
-     * para escapar. Ver 10_TECH/SECURITY_MODEL.md.
-     */
+    /** Resuelve una ruta y falla si se sale del workspace. */
     private fun resolve(path: String): File {
         val f = if (File(path).isAbsolute) File(path) else File(workspace, path)
         val canonical = f.canonicalFile
@@ -265,12 +254,7 @@ class UnixToolset(
     }
 }
 
-/**
- * Traduce un glob a regex.
- *
- * `**` cruza directorios y `*` no, que es lo que espera cualquiera que haya
- * usado un glob antes.
- */
+/** Traduce un glob a regex. */
 internal fun globToRegex(pattern: String): Regex {
     val sb = StringBuilder("^")
     var i = 0

@@ -2,13 +2,7 @@ package com.termdroid.probe
 
 import com.termdroid.exec.ExecBackend
 
-/**
- * Lo que este device concreto puede hacer, medido y no supuesto.
- *
- * Cada campo que sea `false` tiene que poder explicarse al usuario: la UI dice
- * que falta y que se pierde, nunca esconde la funcion en silencio.
- * Ver 10_TECH/COMPATIBILITY.md.
- */
+/** Lo que este device concreto puede hacer, medido y no supuesto. */
 data class DeviceCapabilities(
     val backend: ExecBackend,
     val directExec: Boolean,

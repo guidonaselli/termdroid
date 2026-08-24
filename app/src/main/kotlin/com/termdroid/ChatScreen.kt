@@ -44,13 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.termdroid.agent.AutonomyMode
 
-/**
- * El chat con el agente.
- *
- * Chat primero, terminal segundo: el 90% del tiempo no se quiere tipear
- * comandos sino pedir cosas. Y los tool calls se renderizan como componentes,
- * no como texto. Ver 10_TECH/UX_PRINCIPLES.md.
- */
+/** El chat con el agente. */
 @Composable
 fun ChatScreen(vm: AgentViewModel, modifier: Modifier = Modifier) {
     val state by vm.state.collectAsState()
@@ -138,8 +132,6 @@ private fun ChatBubble(item: ChatItem) {
             modifier = Modifier.fillMaxWidth(),
         )
 
-        // El pensamiento se muestra plegado: informa que algo pasa sin tapar la
-        // respuesta.
         is ChatItem.Thinking -> {
             var open by remember { mutableStateOf(false) }
             Surface(
@@ -214,10 +206,7 @@ private fun ToolCardView(card: ChatItem.ToolCard) {
     }
 }
 
-/**
- * La aprobacion muestra la accion exacta, nunca un resumen del modelo.
- * Ver 10_TECH/SECURITY_MODEL.md.
- */
+/** La aprobacion muestra la accion exacta, nunca un resumen del modelo. */
 @Composable
 private fun ApprovalCard(pending: PendingApproval, onDecide: (Boolean) -> Unit) {
     Surface(color = MaterialTheme.colorScheme.tertiaryContainer, modifier = Modifier.fillMaxWidth()) {

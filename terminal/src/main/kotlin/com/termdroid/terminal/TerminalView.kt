@@ -23,13 +23,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.text.AnnotatedString
 
-/**
- * Paleta del terminal.
- *
- * Los 16 colores base se resuelven segun el tema: el buffer guarda "rojo", no un
- * ARGB, asi que un mismo output se ve legible en claro y en oscuro.
- * Ver 10_TECH/UX_PRINCIPLES.md.
- */
+/** Paleta del terminal. */
 data class TerminalPalette(
     val background: Color,
     val foreground: Color,
@@ -87,12 +81,7 @@ data class TerminalPalette(
     }
 }
 
-/**
- * Dibuja la pantalla del terminal.
- *
- * Se dibuja en Canvas y no con Text por celda: una grilla de 24x80 son 1920
- * composables por frame, que es insostenible en un telefono.
- */
+/** Dibuja la pantalla del terminal. */
 @Composable
 fun TerminalView(
     screen: ScreenSnapshot,
@@ -118,8 +107,6 @@ fun TerminalView(
             if (cellW <= 0f || cellH <= 0f) return@Canvas
 
             // La grilla sale de la celda MEDIDA, no de una estimacion: si el
-            // buffer y el renderer no coinciden en cuantas columnas entran, el
-            // texto se dibuja fuera de lugar.
             onGridSize(
                 (size.height / cellH).toInt().coerceIn(4, 200),
                 (size.width / cellW).toInt().coerceIn(20, 400),
@@ -152,7 +139,6 @@ private fun DrawScope.drawScreen(
             }
 
             // Agrupa celdas contiguas con el mismo estilo: dibujar caracter por
-            // caracter multiplica las llamadas de dibujo sin necesidad.
             val start = c
             val sb = StringBuilder()
             while (c < screen.cols && screen.cells[r][c].style == style) {
@@ -179,9 +165,6 @@ private fun DrawScope.drawScreen(
                         fontStyle = if (style.italic) FontStyle.Italic else FontStyle.Normal,
                     ),
                     // Sin esto drawText envuelve el texto por su cuenta cuando la
-                    // corrida excede el ancho del canvas, y las lineas que agrega
-                    // caen encima de la fila siguiente. El wrap ya lo hizo el
-                    // buffer: aca cada corrida es una linea y solo una.
                     softWrap = false,
                     maxLines = 1,
                 )

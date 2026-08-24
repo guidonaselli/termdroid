@@ -39,13 +39,7 @@ import com.termdroid.terminal.ShellSession
 import com.termdroid.terminal.TerminalView
 import kotlinx.coroutines.launch
 
-/**
- * Pantalla de terminal.
- *
- * Cumple los principios de UX que aplican en esta etapa: no pide ningun permiso,
- * no muestra pantalla de bienvenida, y la barra de teclas es propia en vez de
- * exigir un teclado especial. Ver 10_TECH/UX_PRINCIPLES.md.
- */
+/** Pantalla de terminal. */
 @Composable
 fun TerminalScreen(session: ShellSession, modifier: Modifier = Modifier) {
     val screen by session.screen.collectAsState()
@@ -54,8 +48,7 @@ fun TerminalScreen(session: ShellSession, modifier: Modifier = Modifier) {
     var input by remember { mutableStateOf("") }
 
     Column(modifier = modifier.fillMaxSize().imePadding().navigationBarsPadding()) {
-        // La vista mide la celda y reporta cuantas filas y columnas entran; el
-        // proceso tiene que saber contra que grilla esta dibujando.
+        // La grilla la reporta la vista desde la celda medida.
         var grid by remember { mutableStateOf(0 to 0) }
 
         LaunchedEffect(grid, alive) {
@@ -109,12 +102,7 @@ fun TerminalScreen(session: ShellSession, modifier: Modifier = Modifier) {
     }
 }
 
-/**
- * Barra de teclas contextual.
- *
- * Un teclado de Android no tiene Ctrl, Esc ni Tab, y pedirle al usuario que
- * instale un teclado hacker es exactamente la friccion que este proyecto evita.
- */
+/** Barra de teclas contextual. */
 @Composable
 private fun KeyRow(onKey: (String) -> Unit) {
     val keys = listOf(

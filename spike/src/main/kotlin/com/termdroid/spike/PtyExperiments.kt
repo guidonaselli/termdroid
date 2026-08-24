@@ -5,20 +5,10 @@ import java.io.File
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
-/**
- * Experimentos de PTY y shebangs (F-001 / S3).
- *
- * Un pipe no alcanza para un shell util: sin tty no hay control de trabajos,
- * ni edicion de linea, ni programas de pantalla completa. Lo que se verifica
- * es que el hijo tenga una terminal de verdad y que respete el tamano.
- */
+/** Experimentos de PTY y shebangs (F-001 / S3). */
 class PtyExperiments(private val ctx: Context) {
 
-    /**
-     * Abre un shell sobre PTY, le manda un guion y devuelve lo que salio.
-     *
-     * `tty` prueba que hay terminal; `stty size` prueba que TIOCSWINSZ llego.
-     */
+    /** Abre un shell sobre PTY, le manda un guion y devuelve lo que salio. */
     fun shellSession(rows: Int = 24, cols: Int = 80): String {
         val argv = arrayOf(SH)
         val env = arrayOf(
@@ -106,14 +96,7 @@ class PtyExperiments(private val ctx: Context) {
         }
     }
 
-    /**
-     * Shebangs.
-     *
-     * Un script en filesDir no se puede ejecutar directo (mismo bloqueo que el
-     * nivel 0) y tampoco pasa por el linker, porque no es ELF. La unica salida
-     * es leer el `#!` y ejecutar al interprete con el script como argumento:
-     * eso es lo que hara el exec shim.
-     */
+    /** Shebangs. */
     fun shebang(): String {
         val script = File(ctx.filesDir, "hola.sh")
         script.writeText("#!$SH\necho SHEBANG_OK argv0=\$0 arg1=\$1\n")

@@ -4,14 +4,7 @@ import org.json.JSONObject
 
 enum class Role { USER, ASSISTANT, SYSTEM }
 
-/**
- * Un bloque de contenido.
- *
- * Se modela lo que devuelve la API tal cual, sin aplanar a texto: los bloques de
- * thinking hay que reenviarlos sin modificar y los de compaction hay que
- * preservarlos, o la sesion larga se rompe en silencio.
- * Ver 10_TECH/AGENT_LOOP.md.
- */
+/** Un bloque de contenido. */
 sealed interface Block {
     data class Text(val text: String) : Block
 
@@ -35,12 +28,7 @@ data class Msg(val role: Role, val blocks: List<Block>) {
         fun userBlocks(blocks: List<Block>) = Msg(Role.USER, blocks)
         fun assistant(blocks: List<Block>) = Msg(Role.ASSISTANT, blocks)
 
-        /**
-         * Instruccion de operador a mitad de conversacion.
-         *
-         * Va dentro de `messages` y no en el `system` de arriba: asi el estado que
-         * cambia (bateria, red, directorio) no invalida el prefijo cacheado.
-         */
+        /** Instruccion de operador a mitad de conversacion. */
         fun system(text: String) = Msg(Role.SYSTEM, listOf(Block.Text(text)))
     }
 }

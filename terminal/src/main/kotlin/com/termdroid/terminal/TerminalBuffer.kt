@@ -1,11 +1,6 @@
 package com.termdroid.terminal
 
-/**
- * La pantalla del terminal: una grilla de celdas, un cursor y un scrollback.
- *
- * Es deliberadamente tonto. No interpreta secuencias de escape —de eso se
- * ocupa [VtParser]— para poder testearse solo, sin parser de por medio.
- */
+/** La pantalla del terminal: una grilla de celdas, un cursor y un scrollback. */
 class TerminalBuffer(
     rows: Int = 24,
     cols: Int = 80,
@@ -39,12 +34,7 @@ class TerminalBuffer(
 
     // --- escritura -------------------------------------------------------
 
-    /**
-     * Escribe un caracter en el cursor y avanza.
-     *
-     * El wrap al llegar al borde derecho es lo que espera cualquier shell; sin
-     * el, las lineas largas se pisan a si mismas.
-     */
+    /** Escribe un caracter en el cursor y avanza. */
     fun put(c: Char) {
         if (cursorCol >= cols) {
             cursorCol = 0
@@ -125,11 +115,7 @@ class TerminalBuffer(
 
     // --- tamano ----------------------------------------------------------
 
-    /**
-     * Cambia el tamano preservando el contenido que entra.
-     *
-     * Se conserva la parte de arriba: es donde esta lo que el usuario ya leyo.
-     */
+    /** Cambia el tamano preservando el contenido que entra. */
     fun resize(newRows: Int, newCols: Int) {
         if (newRows == rows && newCols == cols) return
         if (newRows <= 0 || newCols <= 0) return

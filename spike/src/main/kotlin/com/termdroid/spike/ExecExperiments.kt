@@ -4,15 +4,7 @@ import android.content.Context
 import android.os.Build
 import java.io.File
 
-/**
- * Los experimentos de F-001, uno por nivel del modelo de ejecucion.
- *
- * El mismo binario se ejecuta desde dos ubicaciones distintas para aislar la
- * unica variable que importa: donde vive el archivo. Si nivel 1 pasa y nivel 0
- * falla, la causa es SELinux y no el binario.
- *
- * Ver 10_TECH/EXEC_MODEL.md.
- */
+/** Los experimentos de F-001, uno por nivel del modelo de ejecucion. */
 class ExecExperiments(private val ctx: Context) {
 
     private val nativeDir: String get() = ctx.applicationInfo.nativeLibraryDir
@@ -33,12 +25,7 @@ class ExecExperiments(private val ctx: Context) {
         appendLine("linker      = $linker (existe=${File(linker).exists()})")
     }
 
-    /**
-     * Copia el binario de nativeLibraryDir a filesDir.
-     *
-     * Es exactamente lo que hara el instalador del rootfs, y lo que activa la
-     * restriccion: en filesDir el archivo es `app_data_file`.
-     */
+    /** Copia el binario de nativeLibraryDir a filesDir. */
     fun stageIntoFilesDir(): String = buildString {
         val src = nativeBinary
         if (!src.exists()) {
@@ -74,12 +61,7 @@ class ExecExperiments(private val ctx: Context) {
         )
     }
 
-    /**
-     * Nivel 2 sobre el binario de nativeLibraryDir.
-     *
-     * Control del experimento: si esto anda y level2() no, el problema es la
-     * ubicacion del archivo. Si fallan los dos, el problema es el linker.
-     */
+    /** Nivel 2 sobre el binario de nativeLibraryDir. */
     fun level2Control(): String {
         val bin = nativeBinary
         if (!bin.exists()) return "FALLO: no existe $bin"

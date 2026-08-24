@@ -1,15 +1,3 @@
-// Primitivas de ejecucion para el spike de F-001.
-//
-// Una sola funcion generica: fork + execv con captura de stdout/stderr.
-// Los tres niveles del modelo de ejecucion se distinguen unicamente por el
-// argv que arma el lado Kotlin, no por caminos de codigo distintos:
-//
-//   nivel 0  argv = [ "<filesDir>/tdhello", ... ]
-//   nivel 1  argv = [ "<nativeLibraryDir>/libtdhello.so", ... ]
-//   nivel 2  argv = [ "/system/bin/linker64", "<filesDir>/tdhello", ... ]
-//
-// Que el fallo sea legible importa tanto como que el exito lo sea: si el
-// nivel 2 no anda hay que poder decir por que. Ver 10_TECH/EXEC_MODEL.md.
 
 #include <jni.h>
 #include <errno.h>

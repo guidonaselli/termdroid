@@ -23,13 +23,7 @@ import kotlinx.coroutines.flow.flowOn
 import org.json.JSONArray
 import org.json.JSONObject
 
-/**
- * Transporte real contra la Messages API.
- *
- * Traduce el modelo de conversacion propio al del SDK. El loop no conoce el SDK:
- * eso es lo que lo deja testeable sin red. Configuracion y por que, en
- * 10_TECH/AGENT_LOOP.md.
- */
+/** Transporte real contra la Messages API. */
 class ClaudeTransport(
     apiKey: String,
     private val model: String = DEFAULT_MODEL,
@@ -55,8 +49,7 @@ class ClaudeTransport(
                 val event = events.next()
                 accumulator.accumulate(event)
 
-                // Los deltas se juntan dentro del callback y se emiten afuera:
-                // `ifPresent` no es un contexto de corrutina.
+                // Se juntan en el callback y se emiten afuera: ifPresent no suspende.
                 val pending = mutableListOf<StreamEvent>()
                 event.contentBlockDelta().ifPresent { d ->
                     d.delta().text().ifPresent { pending += StreamEvent.Text(it.text()) }
@@ -77,16 +70,12 @@ class ClaudeTransport(
         val builder = MessageCreateParams.builder()
             .model(model)
             .maxTokens(maxTokens)
-            // Adaptive con resumen visible: el default es "omitted" y sin esto la
-            // UI muestra una pausa larga sin explicacion.
             .thinking(
                 ThinkingConfigAdaptive.builder()
                     .display(ThinkingConfigAdaptive.Display.SUMMARIZED)
                     .build(),
             )
             .outputConfig(OutputConfig.builder().effort(effort).build())
-            // El system va como bloque con cache_control: cierra el prefijo
-            // estable (tools -> system -> messages).
             .systemOfTextBlockParams(
                 listOf(
                     TextBlockParam.builder()
@@ -112,8 +101,6 @@ class ClaudeTransport(
                     }
                 }.build(),
             )
-            // strict lo exige, y ademas evita tener que defenderse de campos
-            // que el modelo no deberia mandar.
             .putAdditionalProperty("additionalProperties", JsonValue.from(false))
 
         inputSchema.optJSONArray("required")?.let { req ->
@@ -132,8 +119,7 @@ class ClaudeTransport(
         val sdkRole = when (role) {
             Role.USER -> MessageParam.Role.USER
             Role.ASSISTANT -> MessageParam.Role.ASSISTANT
-            // Los system message a mitad de conversacion no van por este camino:
-            // se ignoran en vez de corromper el historial.
+            // Los system message a mitad de conversacion no se mandan.
             Role.SYSTEM -> return null
         }
 
@@ -166,9 +152,7 @@ class ClaudeTransport(
                     .build(),
             )
 
-        // Thinking y bloques opacos se preservan en el historial propio, pero no
-        // se reconstruyen a mano hacia el SDK: mal reconstruidos corrompen la
-        // sesion en silencio, que es peor que omitirlos.
+        // Thinking y opacos no se reconstruyen hacia el SDK.
         is Block.Thinking -> null
         is Block.Opaque -> null
     }
@@ -191,8 +175,7 @@ class ClaudeTransport(
 
         val stop = stopReason().map { it.toStopReason() }.orElse(StopReason.OTHER)
 
-        // stop_details solo viene poblado cuando hubo refusal: hay que guardar
-        // antes de leerlo.
+        // stop_details solo viene poblado con refusal.
         val refusal = if (stop == StopReason.REFUSAL) {
             stopDetails().map { Refusal(it.category().toString(), it.explanation().orElse(null)) }
                 .orElse(Refusal(null, null))

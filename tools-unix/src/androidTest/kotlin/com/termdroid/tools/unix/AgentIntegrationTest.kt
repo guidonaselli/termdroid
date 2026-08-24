@@ -27,12 +27,7 @@ import org.junit.Before
 import org.junit.Test
 import java.io.File
 
-/**
- * El camino completo del agente contra tools reales, en un device real.
- *
- * El modelo se reemplaza por un guion; todo lo demas es de verdad: el shell, el
- * filesystem y las aprobaciones. Es lo que verifica que las piezas encajan.
- */
+/** El camino completo del agente contra tools reales, en un device real. */
 class AgentIntegrationTest {
 
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext

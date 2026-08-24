@@ -1,11 +1,6 @@
 package com.termdroid.exec
 
-/**
- * Como este device puede ejecutar binarios.
- *
- * No se deduce de [android.os.Build.VERSION] ni de una lista de modelos: lo
- * decide el capability probe midiendolo. Ver 10_TECH/COMPATIBILITY.md.
- */
+/** Como este device puede ejecutar binarios. */
 enum class ExecBackend {
     /** `execve` directo sobre filesDir. Devices donde el sepolicy no tiene la regla. */
     DIRECT,

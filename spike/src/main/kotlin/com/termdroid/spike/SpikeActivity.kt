@@ -52,7 +52,6 @@ private fun SpikeScreen() {
     }
 
     // Corre la bateria completa al abrir: el resultado queda en logcat y se puede
-    // capturar sin tocar la pantalla (emulador headless, CI, device por adb).
     androidx.compose.runtime.LaunchedEffect(Unit) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val exec = runCatching { exp.runAll() }.getOrElse { "EXCEPCION: $it" }

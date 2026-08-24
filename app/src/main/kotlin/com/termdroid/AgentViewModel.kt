@@ -57,12 +57,7 @@ data class ChatState(
     val cacheRead: Long = 0,
 )
 
-/**
- * Dueno de la sesion de agente.
- *
- * Vive en el ViewModel y no en la Activity: la sesion tiene que sobrevivir a
- * rotaciones y a que se abra el teclado. Ver 10_TECH/UX_PRINCIPLES.md.
- */
+/** Dueno de la sesion de agente. */
 class AgentViewModel(app: Application) : AndroidViewModel(app) {
 
     private val secrets = SecretStore(app)
@@ -118,12 +113,7 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
         ).also { it.autonomy = _state.value.autonomy }
     }
 
-    /**
-     * El system prompt es fijo.
-     *
-     * Nada de timestamps ni estado del device aca dentro: es el final del prefijo
-     * cacheado y cualquier byte que cambie tira el cache. Ver 10_TECH/AGENT_LOOP.md.
-     */
+    /** El system prompt es fijo. */
     private fun systemPrompt(caps: DeviceCapabilities): String = buildString {
         appendLine("Sos un agente que corre dentro de una app de Android, en el telefono del usuario.")
         appendLine()

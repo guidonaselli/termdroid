@@ -14,12 +14,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Verifica el camino completo: PTY -> parser -> pantalla, contra un shell real.
- *
- * Un test unitario del parser no alcanza: lo que puede romperse aca es la union
- * de las piezas, y eso solo se ve corriendo un shell de verdad.
- */
+/** Verifica el camino completo: PTY -> parser -> pantalla, contra un shell real. */
 class ShellSessionTest {
 
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
@@ -42,13 +37,7 @@ class ShellSessionTest {
         true
     } ?: false
 
-    /**
-     * Espera a que [needle] aparezca en pantalla.
-     *
-     * Ojo: el terminal hace eco de lo que se escribe, asi que si el comando
-     * contiene el texto buscado esta espera termina antes de que exista la
-     * salida. Para esos casos hay que esperar por la linea, no por el texto.
-     */
+    /** Espera a que [needle] aparezca en pantalla. */
     private suspend fun waitForScreen(s: ShellSession, needle: String, timeoutMs: Long = 6000): Boolean =
         waitForScreen(s, timeoutMs) { it.text().contains(needle) }
 
@@ -69,10 +58,7 @@ class ShellSessionTest {
         assertTrue("no aparecio la salida. Pantalla:\n${s.screen.value.text()}", visto)
     }
 
-    /**
-     * Cero friccion: esto tiene que andar sin ningun rootfs instalado, porque
-     * Android ya trae un entorno POSIX usable. Ver 10_TECH/ONBOARDING.md.
-     */
+    /** Cero friccion: esto tiene que andar sin ningun rootfs instalado. */
     @Test
     fun andaSinRootfsUsandoLoQueTraeAndroid() = runBlocking {
         val s = ShellSession(context, ExecBackend.NATIVE_LIB_DIR, scope).also { session = it }
@@ -84,26 +70,16 @@ class ShellSessionTest {
         assertTrue("toybox deberia alcanzar. Pantalla:\n${s.screen.value.text()}", visto)
     }
 
-    /**
-     * El color que emite un programa tiene que llegar a la celda, no al texto.
-     *
-     * No se puede afirmar sobre la pantalla entera: el terminal hace eco de lo
-     * que uno tipea, y el comando tipeado contiene los caracteres `\033[1;32m`
-     * como texto literal. Lo que se verifica es la linea que **produjo** el
-     * programa, y sobre ella el estilo de la celda.
-     */
+    /** El color que emite un programa tiene que llegar a la celda, no al texto. */
     @Test
     fun elColorEmitidoLlegaALaCelda() = runBlocking {
         val s = ShellSession(context, ExecBackend.NATIVE_LIB_DIR, scope).also { session = it }
         s.start()
 
         // El ESC lo genera printf, no se manda crudo: el line editor del shell
-        // interpreta un ESC entrante como el inicio de una tecla y se come la
-        // secuencia antes de que llegue a ejecutarse el comando.
         s.send("printf '\\033[1;32mVERDE\\033[0m\\n'\n")
 
         // Se espera por la LINEA, no por el texto: el eco del comando ya
-        // contiene "VERDE" y la espera terminaria antes de tiempo.
         val aparecio = waitForScreen(s) { lineaExacta(it, "VERDE") != null }
 
         val screen = s.screen.value
@@ -129,12 +105,7 @@ class ShellSessionTest {
         assertTrue("el proceso no vio el tamano nuevo. Pantalla:\n${s.screen.value.text()}", visto)
     }
 
-    /**
-     * Regresion: cerrar una sesion dejaba al hijo como zombie.
-     *
-     * Matar no alcanza, hay que cosecharlo. Se veia como entradas en estado Z
-     * acumulandose en la tabla de procesos de la app.
-     */
+    /** Regresion: cerrar una sesion dejaba al hijo como zombie. */
     @Test
     fun cerrarLaSesionNoDejaZombies() = runBlocking {
         val antes = contarZombies()
@@ -150,13 +121,7 @@ class ShellSessionTest {
         assertTrue("quedaron zombies: antes=$antes despues=$despues", despues <= antes)
     }
 
-    /**
-     * Regresion: el hilo lector del PTY y el de UI tocaban el buffer a la vez.
-     *
-     * Pasa de verdad cada vez que se abre el teclado: la vista se achica y llama
-     * a resize mientras el shell sigue escribiendo. Sin serializar, la pantalla
-     * quedaba vacia o inconsistente.
-     */
+    /** Regresion: el hilo lector del PTY y el de UI tocaban el buffer a la vez. */
     @Test
     fun redimensionarMientrasLlegaSalidaNoRompeLaPantalla() = runBlocking {
         val s = ShellSession(context, ExecBackend.NATIVE_LIB_DIR, scope).also { session = it }

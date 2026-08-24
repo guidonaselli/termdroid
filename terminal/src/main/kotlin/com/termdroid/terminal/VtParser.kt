@@ -1,15 +1,6 @@
 package com.termdroid.terminal
 
-/**
- * Interpreta la salida de un programa de terminal y la aplica sobre un [TerminalBuffer].
- *
- * Es una maquina de estados sobre bytes, no un parser de lineas: las secuencias
- * llegan partidas entre lecturas del PTY y hay que poder retomarlas.
- *
- * Cubre el subconjunto que usa un shell de verdad: movimiento de cursor, borrado
- * y SGR. Lo que no se entiende se descarta en silencio, que es lo que hace un
- * terminal real y lo que evita que basura en pantalla se vuelva un crash.
- */
+/** Interpreta la salida de un programa de terminal y la aplica sobre un [TerminalBuffer]. */
 class VtParser(private val buffer: TerminalBuffer) {
 
     private enum class State { GROUND, ESC, CSI, OSC, OSC_ESC }
@@ -89,7 +80,6 @@ class VtParser(private val buffer: TerminalBuffer) {
 
     private fun dispatch(cmd: Char) {
         // Los modos privados (DECSET/DECRST, p.ej. cursor visible o pantalla
-        // alternativa) no cambian el contenido: se aceptan y se ignoran.
         if (private) return
 
         val args = params.toString().split(';').map { it.toIntOrNull() ?: 0 }
