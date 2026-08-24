@@ -3,7 +3,6 @@ package com.termdroid
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -32,12 +31,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.layout.BoxWithConstraints
 import com.termdroid.terminal.ShellSession
 import com.termdroid.terminal.TerminalView
 import kotlinx.coroutines.launch
@@ -57,30 +54,23 @@ fun TerminalScreen(session: ShellSession, modifier: Modifier = Modifier) {
     var input by remember { mutableStateOf("") }
 
     Column(modifier = modifier.fillMaxSize().imePadding().navigationBarsPadding()) {
-        BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
-            val density = LocalDensity.current
+        // La vista mide la celda y reporta cuantas filas y columnas entran; el
+        // proceso tiene que saber contra que grilla esta dibujando.
+        var grid by remember { mutableStateOf(0 to 0) }
 
-            // El tamano de la grilla lo manda la vista, no un valor fijo: el
-            // proceso tiene que saber contra que ancho esta dibujando.
-            val cols: Int
-            val rows: Int
-            with(density) {
-                val charW = (FONT_SIZE.toPx() * MONO_ASPECT)
-                val lineH = FONT_SIZE.toPx() * LINE_HEIGHT
-                cols = ((maxWidth.toPx() - 8.dp.toPx()) / charW).toInt().coerceIn(20, 400)
-                rows = ((maxHeight.toPx() - 8.dp.toPx()) / lineH).toInt().coerceIn(4, 200)
-            }
-
-            LaunchedEffect(rows, cols) {
-                if (alive) session.resize(rows, cols)
-            }
-
-            TerminalView(
-                screen = screen,
-                modifier = Modifier.fillMaxSize(),
-                fontSize = FONT_SIZE,
-            )
+        LaunchedEffect(grid, alive) {
+            val (rows, cols) = grid
+            if (alive && rows > 0 && cols > 0) session.resize(rows, cols)
         }
+
+        TerminalView(
+            screen = screen,
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            fontSize = FONT_SIZE,
+            onGridSize = { rows, cols ->
+                if (grid != rows to cols) grid = rows to cols
+            },
+        )
 
         if (!alive) {
             Surface(color = MaterialTheme.colorScheme.errorContainer) {
@@ -159,7 +149,3 @@ private fun KeyRow(onKey: (String) -> Unit) {
 }
 
 private val FONT_SIZE = 12.sp
-
-// Proporciones tipicas de una monoespaciada; alcanza para elegir la grilla.
-private const val MONO_ASPECT = 0.6f
-private const val LINE_HEIGHT = 1.35f

@@ -32,12 +32,31 @@ class ShellSessionTest {
         scope.cancel()
     }
 
-    /** Espera a que la pantalla contenga [needle], o se rinde. */
+    /** Espera a que la pantalla cumpla [cond], o se rinde. */
+    private suspend fun waitForScreen(
+        s: ShellSession,
+        timeoutMs: Long = 6000,
+        cond: (ScreenSnapshot) -> Boolean,
+    ): Boolean = withTimeoutOrNull(timeoutMs) {
+        while (!cond(s.screen.value)) delay(50)
+        true
+    } ?: false
+
+    /**
+     * Espera a que [needle] aparezca en pantalla.
+     *
+     * Ojo: el terminal hace eco de lo que se escribe, asi que si el comando
+     * contiene el texto buscado esta espera termina antes de que exista la
+     * salida. Para esos casos hay que esperar por la linea, no por el texto.
+     */
     private suspend fun waitForScreen(s: ShellSession, needle: String, timeoutMs: Long = 6000): Boolean =
-        withTimeoutOrNull(timeoutMs) {
-            while (!s.screen.value.text().contains(needle)) delay(50)
-            true
-        } ?: false
+        waitForScreen(s, timeoutMs) { it.text().contains(needle) }
+
+    /** Indice de la primera linea cuyo contenido es exactamente [text]. */
+    private fun lineaExacta(screen: ScreenSnapshot, text: String): Int? =
+        (0 until screen.rows).firstOrNull { r ->
+            String(CharArray(screen.cols) { screen.cells[r][it].char }).trimEnd() == text
+        }
 
     @Test
     fun elShellArrancaYRespondeUnComando() = runBlocking {
@@ -83,16 +102,14 @@ class ShellSessionTest {
         // secuencia antes de que llegue a ejecutarse el comando.
         s.send("printf '\\033[1;32mVERDE\\033[0m\\n'\n")
 
-        assertTrue(waitForScreen(s, "VERDE"))
+        // Se espera por la LINEA, no por el texto: el eco del comando ya
+        // contiene "VERDE" y la espera terminaria antes de tiempo.
+        val aparecio = waitForScreen(s) { lineaExacta(it, "VERDE") != null }
 
         val screen = s.screen.value
-        // La linea de salida es la que tiene VERDE al principio, no la del eco.
-        val row = (0 until screen.rows).firstOrNull { r ->
-            String(CharArray(screen.cols) { screen.cells[r][it].char }).trimEnd() == "VERDE"
-        }
-        assertTrue("no aparecio VERDE en una linea propia:\n${screen.text()}", row != null)
+        assertTrue("no aparecio VERDE en una linea propia:\n${screen.text()}", aparecio)
 
-        val cell = screen.cells[row!!][0]
+        val cell = screen.cells[lineaExacta(screen, "VERDE")!!][0]
         assertEquals("el verde no llego a la celda", TermColor.Indexed(2), cell.style.fg)
         assertTrue("la negrita no llego a la celda", cell.style.bold)
     }

@@ -99,6 +99,7 @@ fun TerminalView(
     modifier: Modifier = Modifier,
     fontSize: androidx.compose.ui.unit.TextUnit = 12.sp,
     palette: TerminalPalette = if (isSystemInDarkTheme()) TerminalPalette.Dark else TerminalPalette.Light,
+    onGridSize: (rows: Int, cols: Int) -> Unit = { _, _ -> },
 ) {
     val measurer = rememberTextMeasurer()
     val baseStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = fontSize)
@@ -114,7 +115,17 @@ fun TerminalView(
             .padding(4.dp),
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            if (screen.rows == 0 || cellW <= 0f) return@Canvas
+            if (cellW <= 0f || cellH <= 0f) return@Canvas
+
+            // La grilla sale de la celda MEDIDA, no de una estimacion: si el
+            // buffer y el renderer no coinciden en cuantas columnas entran, el
+            // texto se dibuja fuera de lugar.
+            onGridSize(
+                (size.height / cellH).toInt().coerceIn(4, 200),
+                (size.width / cellW).toInt().coerceIn(20, 400),
+            )
+
+            if (screen.rows == 0) return@Canvas
             drawScreen(screen, palette, baseStyle, cellW, cellH, measurer)
         }
     }
@@ -167,6 +178,12 @@ private fun DrawScope.drawScreen(
                         fontWeight = if (style.bold) FontWeight.Bold else FontWeight.Normal,
                         fontStyle = if (style.italic) FontStyle.Italic else FontStyle.Normal,
                     ),
+                    // Sin esto drawText envuelve el texto por su cuenta cuando la
+                    // corrida excede el ancho del canvas, y las lineas que agrega
+                    // caen encima de la fila siguiente. El wrap ya lo hizo el
+                    // buffer: aca cada corrida es una linea y solo una.
+                    softWrap = false,
+                    maxLines = 1,
                 )
             }
         }
