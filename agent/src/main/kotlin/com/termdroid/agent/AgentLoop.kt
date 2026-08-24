@@ -48,6 +48,7 @@ class AgentLoop(
     private val tools: ToolRegistry,
     private val systemPrompt: String,
     private val approvalGate: ApprovalGate,
+    private val volatileContext: () -> String? = { null },
 ) {
     var autonomy: AutonomyMode = AutonomyMode.AUTO_READ
 
@@ -63,6 +64,7 @@ class AgentLoop(
 
     fun run(userInput: String): Flow<AgentEvent> = flow {
         history.add(Msg.user(userInput))
+        volatileContext()?.takeIf { it.isNotBlank() }?.let { history.add(Msg.system(it)) }
 
         try {
             while (true) {

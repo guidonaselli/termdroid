@@ -119,8 +119,7 @@ class ClaudeTransport(
         val sdkRole = when (role) {
             Role.USER -> MessageParam.Role.USER
             Role.ASSISTANT -> MessageParam.Role.ASSISTANT
-            // Los system message a mitad de conversacion no se mandan.
-            Role.SYSTEM -> return null
+            Role.SYSTEM -> MessageParam.Role.SYSTEM
         }
 
         val params = blocks.mapNotNull { it.toSdkBlock() }
