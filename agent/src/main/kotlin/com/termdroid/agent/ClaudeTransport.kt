@@ -62,7 +62,7 @@ class ClaudeTransport(
         emit(StreamEvent.Final(accumulator.message().toTurnResult()))
     }.flowOn(Dispatchers.IO)
 
-    private fun buildParams(
+    internal fun buildParams(
         system: String,
         tools: List<ToolSpec>,
         messages: List<Msg>,

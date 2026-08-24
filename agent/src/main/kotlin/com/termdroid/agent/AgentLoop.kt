@@ -5,6 +5,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import org.json.JSONArray
 import org.json.JSONObject
 
 /** Lo que la UI observa mientras el agente trabaja. */
@@ -184,7 +185,7 @@ fun objectSchema(
 ): JSONObject = JSONObject()
     .put("type", "object")
     .put("properties", JSONObject().apply { properties.forEach { put(it.first, it.second) } })
-    .put("required", required)
+    .put("required", JSONArray(required))
     .put("additionalProperties", false)
 
 fun stringProp(description: String): JSONObject =
