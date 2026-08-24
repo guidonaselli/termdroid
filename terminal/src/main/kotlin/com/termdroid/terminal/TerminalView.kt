@@ -17,6 +17,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -127,7 +130,9 @@ fun TerminalView(
     BoxWithConstraints(
         modifier = modifier
             .background(palette.background)
-            .padding(4.dp),
+            .padding(4.dp)
+            .testTag(TERMINAL_TAG)
+            .semantics { contentDescription = screen.text() },
     ) {
         if (cellW > 0f && cellH > 0f) {
             with(density) {
@@ -140,7 +145,7 @@ fun TerminalView(
 
         val alto = with(density) { (screen.totalRows.coerceAtLeast(1) * cellH).toDp() }
 
-        Box(Modifier.verticalScroll(scroll)) {
+        Box(Modifier.verticalScroll(scroll).testTag(SCROLL_TAG)) {
             Canvas(modifier = Modifier.fillMaxWidth().height(alto)) {
                 if (cellW <= 0f || screen.totalRows == 0) return@Canvas
                 drawScreen(screen, palette, baseStyle, cellW, cellH, measurer)
@@ -216,3 +221,6 @@ private fun DrawScope.drawScreen(
         )
     }
 }
+
+const val TERMINAL_TAG = "terminal"
+const val SCROLL_TAG = "terminal-scroll"
