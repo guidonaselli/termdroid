@@ -48,7 +48,7 @@ class MainActivity : ComponentActivity() {
 
                         when (tab) {
                             0 -> ChatScreen(agent, Modifier.fillMaxSize())
-                            else -> TerminalScreen(terminal.session, Modifier.fillMaxSize())
+                            else -> TerminalScreen(terminal, Modifier.fillMaxSize())
                         }
                     }
                 }

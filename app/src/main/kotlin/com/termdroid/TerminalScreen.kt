@@ -15,6 +15,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -41,7 +42,60 @@ import kotlinx.coroutines.launch
 
 /** Pantalla de terminal. */
 @Composable
-fun TerminalScreen(session: ShellSession, modifier: Modifier = Modifier) {
+fun TerminalScreen(vm: TerminalViewModel, modifier: Modifier = Modifier) {
+    val sesiones by vm.sessions.collectAsState()
+    val activa by vm.activeIndex.collectAsState()
+    val session = sesiones.getOrNull(activa)
+
+    if (session == null) {
+        Text("Este device no puede abrir un shell.", modifier = modifier.padding(16.dp))
+        return
+    }
+
+    Column(modifier.fillMaxSize()) {
+        SesionesBar(
+            cantidad = sesiones.size,
+            activa = activa,
+            onSeleccionar = vm::seleccionar,
+            onNueva = vm::nueva,
+            onCerrar = vm::cerrar,
+        )
+        TerminalPane(session, Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun SesionesBar(
+    cantidad: Int,
+    activa: Int,
+    onSeleccionar: (Int) -> Unit,
+    onNueva: () -> Unit,
+    onCerrar: (Int) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .horizontalScroll(rememberScrollState()),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        repeat(cantidad) { i ->
+            FilterChip(
+                selected = i == activa,
+                onClick = { onSeleccionar(i) },
+                label = { Text("sh ${i + 1}", fontSize = 12.sp) },
+                modifier = Modifier.padding(horizontal = 2.dp),
+            )
+        }
+        TextButton(onClick = onNueva) { Text("+", fontSize = 16.sp) }
+        if (cantidad > 1) {
+            TextButton(onClick = { onCerrar(activa) }) { Text("cerrar", fontSize = 12.sp) }
+        }
+    }
+}
+
+@Composable
+private fun TerminalPane(session: ShellSession, modifier: Modifier = Modifier) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val screen by session.screen.collectAsState()
     val alive by session.alive.collectAsState()
