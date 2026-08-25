@@ -114,6 +114,8 @@ fun ChatScreen(vm: AgentViewModel, modifier: Modifier = Modifier) {
                     },
                 ),
             )
+            DictadoButton(onTexto = { input = (input + " " + it).trim() })
+
             if (state.busy) {
                 OutlinedButton(onClick = vm::cancel) { Text("Parar") }
             } else {
@@ -124,6 +126,47 @@ fun ChatScreen(vm: AgentViewModel, modifier: Modifier = Modifier) {
                     },
                 ) { Text("Enviar") }
             }
+        }
+    }
+}
+
+@Composable
+private fun DictadoButton(onTexto: (String) -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val dictado = remember { Dictado(context) }
+    var escuchando by remember { mutableStateOf(false) }
+    var aviso by remember { mutableStateOf<String?>(null) }
+
+    val pedirPermiso = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { concedido ->
+        if (concedido) {
+            escuchando = true
+            dictado.escuchar { r ->
+                escuchando = false
+                when (r) {
+                    is ResultadoDictado.Texto -> onTexto(r.texto)
+                    is ResultadoDictado.Error -> aviso = r.mensaje
+                }
+            }
+        } else {
+            aviso = "Sin microfono no se puede dictar."
+        }
+    }
+
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        onDispose { dictado.detener() }
+    }
+
+    Column {
+        OutlinedButton(
+            onClick = { pedirPermiso.launch(android.Manifest.permission.RECORD_AUDIO) },
+            enabled = dictado.disponible && !escuchando,
+        ) {
+            Text(if (escuchando) "..." else "Voz")
+        }
+        aviso?.let {
+            Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
         }
     }
 }
