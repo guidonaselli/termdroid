@@ -31,3 +31,14 @@ APKs en `app/build/outputs/apk/debug/` (uno por ABI mas el universal).
 
 Depuracion inalambrica -> emparejar -> `adb connect` -> `./gradlew :app:installDebug`.
 El capability probe deja su veredicto en logcat con el tag de la app.
+
+## Binarios del rootfs
+
+`rootfs/prebuilt/` no está en git: se genera con
+
+```
+rustup target add aarch64-linux-android x86_64-linux-android
+bash rootfs/build-prebuilt.sh
+```
+
+Sin eso la app compila igual; el tool `grep` cae al recorrido en Kotlin.
