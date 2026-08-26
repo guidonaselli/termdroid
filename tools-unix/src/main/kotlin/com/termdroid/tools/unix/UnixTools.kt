@@ -264,11 +264,16 @@ class UnixToolset(
             }
 
             val r = executor.run(bin, args, cwd = workspace)
-            val salida = r.output.substringBeforeLast("[exit=").trim()
+            val crudo = r.output.substringBeforeLast("[exit=").trim()
+
+            // --max-count de ripgrep es por archivo; el limite del tool es total,
+            // asi que se recorta aca para que los dos caminos coincidan.
+            val lineas = crudo.lineSequence().filter { it.isNotBlank() }.toList()
+            val salida = lineas.take(MATCH_LIMIT).joinToString("\n")
 
             return when {
                 salida.isBlank() -> ToolOutcome("Sin coincidencias.")
-                r.exitCode > 1 -> ToolOutcome(truncate(salida), isError = true)
+                r.exitCode > 1 -> ToolOutcome(truncate(crudo), isError = true)
                 else -> ToolOutcome(truncate(salida))
             }
         }

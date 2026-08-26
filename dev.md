@@ -41,4 +41,9 @@ rustup target add aarch64-linux-android x86_64-linux-android
 bash rootfs/build-prebuilt.sh
 ```
 
-Sin eso la app compila igual; el tool `grep` cae al recorrido en Kotlin.
+Trae `rg` (ripgrep) y `jaq` (jq). Sin eso la app compila igual: el
+tool `grep` cae al recorrido en Kotlin y los demás binarios no aparecen.
+
+Las herramientas son de Rust puro o compilables con el clang del NDK. `cc-rs` no
+lee las variables `CARGO_TARGET_*`: necesita `CC_<target>` y `CFLAGS_<target>`
+aparte, que es lo que el script exporta.
