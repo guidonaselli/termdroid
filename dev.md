@@ -47,3 +47,13 @@ tool `grep` cae al recorrido en Kotlin y los demás binarios no aparecen.
 Las herramientas son de Rust puro o compilables con el clang del NDK. `cc-rs` no
 lee las variables `CARGO_TARGET_*`: necesita `CC_<target>` y `CFLAGS_<target>`
 aparte, que es lo que el script exporta.
+
+## Verificar en un device
+
+```
+bash verify-on-device.sh
+```
+
+Corre la suite completa, el gate de ejecución en ese device concreto, e instala
+y abre la app. Da un veredicto. Es lo que hay que correr al conectar un teléfono
+nuevo.
