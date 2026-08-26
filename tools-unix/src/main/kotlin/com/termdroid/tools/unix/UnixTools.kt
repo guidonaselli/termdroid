@@ -21,6 +21,7 @@ class UnixToolset(
     private val backend: ExecBackend,
     /** Raiz a la que se restringen las rutas. */
     private val workspace: File,
+    private val ripgrep: File? = env.packaged("rg").takeIf { it.exists() },
 ) {
     private val executor = Executor(env, backend)
 
@@ -218,6 +219,8 @@ class UnixToolset(
         override fun describe(input: JSONObject) = "grep '${input.optString("pattern")}'"
 
         override suspend fun execute(input: JSONObject): ToolOutcome = withContext(Dispatchers.IO) {
+            ripgrep?.let { return@withContext conRipgrep(it, input) }
+
             runCatching {
                 val regex = Regex(input.getString("pattern"))
                 val fileFilter = input.optString("glob").takeIf { it.isNotBlank() }?.let(::globToRegex)
@@ -243,6 +246,31 @@ class UnixToolset(
                 }
                 ToolOutcome(if (found == 0) "Sin coincidencias." else truncate(out.toString()))
             }.getOrElse { ToolOutcome("Fallo el grep: $it", isError = true) }
+        }
+
+        private fun conRipgrep(bin: File, input: JSONObject): ToolOutcome {
+            val args = buildList {
+                add("--line-number")
+                add("--no-heading")
+                add("--color=never")
+                add("--max-count=$MATCH_LIMIT")
+                input.optString("glob").takeIf { it.isNotBlank() }?.let {
+                    add("--glob")
+                    add(it)
+                }
+                add("--")
+                add(input.getString("pattern"))
+                add(".")
+            }
+
+            val r = executor.run(bin, args, cwd = workspace)
+            val salida = r.output.substringBeforeLast("[exit=").trim()
+
+            return when {
+                salida.isBlank() -> ToolOutcome("Sin coincidencias.")
+                r.exitCode > 1 -> ToolOutcome(truncate(salida), isError = true)
+                else -> ToolOutcome(truncate(salida))
+            }
         }
     }
 

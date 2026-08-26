@@ -11,3 +11,5 @@ local.properties
 *.apk
 *.log
 .memsearch/
+rootfs/prebuilt/
+rootfs/.rust-build/

@@ -8,6 +8,21 @@ android {
 
     defaultConfig {
         minSdk = 26
+        ndk {
+            abiFilters += listOf("arm64-v8a", "x86_64")
+        }
+    }
+
+    sourceSets {
+        getByName("main") {
+            jniLibs.srcDirs("prebuilt")
+        }
+    }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 
     compileOptions {
@@ -16,8 +31,7 @@ android {
     }
 }
 
-
 dependencies {
     implementation(libs.androidx.core.ktx)
-    implementation(project(":exec"))
+    api(project(":exec"))
 }
