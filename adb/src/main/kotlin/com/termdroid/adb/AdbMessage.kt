@@ -2,7 +2,6 @@ package com.termdroid.adb
 
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.util.zip.CRC32
 
 enum class AdbCommand(val value: Int) {
     CNXN(0x4e584e43),
@@ -56,7 +55,7 @@ data class AdbMessage(
         const val AUTH_RSAPUBLICKEY = 3
 
         fun checksum(payload: ByteArray): Int =
-            CRC32().apply { update(payload) }.value.toInt()
+            payload.fold(0) { acc, b -> acc + (b.toInt() and 0xFF) }
 
         fun connect(banner: String = "host::termdroid\u0000"): AdbMessage =
             AdbMessage(AdbCommand.CNXN, VERSION, MAX_PAYLOAD, banner.toByteArray())
@@ -97,6 +96,9 @@ data class AdbHeader(
     val payloadLength: Int,
     val payloadChecksum: Int,
 ) {
-    fun matches(payload: ByteArray): Boolean =
-        payload.size == payloadLength && AdbMessage.checksum(payload) == payloadChecksum
+    fun matches(payload: ByteArray): Boolean {
+        if (payload.size != payloadLength) return false
+        // adbd moderno manda 0 y no valida el campo; los viejos mandan la suma.
+        return payloadChecksum == 0 || payloadChecksum == AdbMessage.checksum(payload)
+    }
 }
