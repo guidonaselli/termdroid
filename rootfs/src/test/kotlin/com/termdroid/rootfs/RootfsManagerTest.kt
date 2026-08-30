@@ -101,6 +101,15 @@ class RootfsManagerTest {
     }
 
     @Test
+    fun aceptaRaizYDescendientesPeroRechazaTraversal() {
+        val target = tempFolder.newFolder("rootfs")
+
+        assertTrue(NodeInstaller.isSafeTarEntry(target, File(target, "./")))
+        assertTrue(NodeInstaller.isSafeTarEntry(target, File(target, "etc/passwd")))
+        assertFalse(NodeInstaller.isSafeTarEntry(target, File(target, "../escape")))
+    }
+
+    @Test
     fun inicializaWrappersDeHardware() {
         manager.ensureBaseEnvironment()
         assertTrue(File(manager.binDir, "termdroid-clipboard").exists())

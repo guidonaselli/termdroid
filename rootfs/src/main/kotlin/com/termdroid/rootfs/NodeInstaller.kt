@@ -283,7 +283,7 @@ object NodeInstaller {
                 val typeFlag = header[156].toInt().toChar()
 
                 val entryFile = File(targetDir, name)
-                check(entryFile.canonicalPath.startsWith(targetDir.canonicalPath + File.separator)) {
+                check(isSafeTarEntry(targetDir, entryFile)) {
                     "Entrada insegura en rootfs: $name"
                 }
                 if (typeFlag == '5' || name.endsWith("/")) {
@@ -320,6 +320,12 @@ object NodeInstaller {
                 }
             }
         }
+    }
+
+    internal fun isSafeTarEntry(targetDir: File, entryFile: File): Boolean {
+        val root = targetDir.canonicalPath
+        val entry = entryFile.canonicalPath
+        return entry == root || entry.startsWith(root + File.separator)
     }
 
     private fun detectArch(): String {
