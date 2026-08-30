@@ -92,7 +92,17 @@ fun ChatScreen(vm: AgentViewModel, modifier: Modifier = Modifier) {
             contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            items(state.items, key = { it.id }) { item -> ChatBubble(item) }
+            if (state.items.isEmpty()) {
+                item {
+                    WelcomeHero(
+                        activeProvider = state.activeProvider,
+                        onOpenSettings = { vm.toggleSettings(true) },
+                        onSuggest = { prompt -> vm.send(prompt) },
+                    )
+                }
+            } else {
+                items(state.items, key = { it.id }) { item -> ChatBubble(item) }
+            }
         }
 
         state.accessNeeded?.let { access ->
@@ -494,3 +504,72 @@ private fun ProviderAuthPrompt(
         }
     }
 }
+
+@Composable
+private fun WelcomeHero(
+    activeProvider: LlmProvider,
+    onOpenSettings: () -> Unit,
+    onSuggest: (String) -> Unit,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text("🤖", fontSize = 24.sp)
+                Column {
+                    Text("Agente Autónomo Termdroid", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("Proveedor activo: ⚡ ${activeProvider.displayName}", style = MaterialTheme.typography.labelMedium)
+                }
+            }
+
+            Text(
+                "Interactuá con la IA para automatizar tu dispositivo, consultar batería, apps instaladas, portapapeles, ejecutar comandos Unix y programar.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+
+            Button(
+                onClick = onOpenSettings,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("⚡ Conectar Suscripción / Cambiar Proveedor")
+            }
+
+            Text("Sugerencias para empezar:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
+
+            val suggestions = listOf(
+                "¿Qué estado tiene la batería y la red?",
+                "Listá las apps instaladas en mi teléfono",
+                "¿Qué herramientas Unix tengo disponibles?",
+                "Decí 'Termdroid activo y listo' por el parlante",
+            )
+
+            suggestions.forEach { s ->
+                Surface(
+                    color = MaterialTheme.colorScheme.surface,
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onSuggest(s) },
+                ) {
+                    Text(
+                        s,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
