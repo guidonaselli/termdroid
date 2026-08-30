@@ -279,12 +279,12 @@ static int run_install(void) {
     }
     close(sock);
 
-    printf("\n⚙️ Actualizando repositorios e instalando Node.js oficial...\n");
+    printf("\n⚙️ Instalando Node.js, npm y CLIs oficiales...\n");
     const char *prefix = getenv("PREFIX");
     if (!prefix) prefix = "/data/data/com.termdroid/files/usr";
 
     char cmd[2048];
-    snprintf(cmd, sizeof(cmd), "export PREFIX=\"%s\" && export HOME=\"/data/data/com.termdroid/files/home\" && export PATH=\"%s/bin:$PATH\" && export LD_LIBRARY_PATH=\"%s/lib:$LD_LIBRARY_PATH\" && export TMPDIR=\"%s/tmp\" && export LD_PRELOAD=\"%s/lib/libtermux-exec.so\" && apt-get update -y && apt-get install -y nodejs git && npm install -g @anthropic-ai/claude-code @openai/codex", prefix, prefix, prefix, prefix, prefix);
+    snprintf(cmd, sizeof(cmd), "\"%s/bin/alpine-sh\" -c \"apk add --no-cache nodejs npm git && npm install -g @anthropic-ai/claude-code @openai/codex\"", prefix);
     int res = system(cmd);
 
     if (res == 0) {
@@ -295,7 +295,6 @@ static int run_install(void) {
     } else {
         printf("\n===========================================\n");
         printf("⚠️ Hubo advertencias o errores durante la instalacion.\n");
-        printf("Podes ejecutar 'apt-get install nodejs' manualmente si es necesario.\n");
         printf("===========================================\n");
     }
     return res;

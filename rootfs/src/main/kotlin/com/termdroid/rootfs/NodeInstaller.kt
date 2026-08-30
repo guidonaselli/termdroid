@@ -9,36 +9,37 @@ import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
-import java.util.zip.ZipInputStream
+import java.util.zip.GZIPInputStream
 
 /**
- * Instalador nativo del entorno base de paquetes Unix, Node.js y los CLIs oficiales.
+ * Instalador de entorno base Linux (Alpine Musl) y Node.js para Android.
+ * No depende de Termux ni de rutas hardcodeadas /data/data/com.termux.
  */
 object NodeInstaller {
 
-    private const val BOOTSTRAP_BASE_URL =
-        "https://github.com/termux/termux-packages/releases/latest/download"
+    private const val ALPINE_VERSION = "v3.21"
+    private const val ALPINE_RELEASE = "3.21.3"
 
     fun isNodeInstalled(prefix: File): Boolean {
-        val nodeBin = File(prefix, "bin/node")
-        val npmBin = File(prefix, "bin/npm")
-        return nodeBin.exists() && npmBin.exists()
+        val alpineDir = File(prefix, "alpine")
+        val nodeBin = File(alpineDir, "usr/bin/node")
+        return nodeBin.exists()
     }
 
     fun isClaudeInstalled(prefix: File): Boolean {
-        val cliMjs = File(prefix, "lib/node_modules/@anthropic-ai/claude-code/cli.mjs")
-        val binClaude = File(prefix, "bin/claude")
-        return cliMjs.exists() || binClaude.exists()
+        val alpineDir = File(prefix, "alpine")
+        val cliMjs = File(alpineDir, "usr/lib/node_modules/@anthropic-ai/claude-code/cli.mjs")
+        return cliMjs.exists()
     }
 
     fun isCodexInstalled(prefix: File): Boolean {
-        val cliMjs = File(prefix, "lib/node_modules/@openai/codex/cli.mjs")
-        val binCodex = File(prefix, "bin/codex")
-        return cliMjs.exists() || binCodex.exists()
+        val alpineDir = File(prefix, "alpine")
+        val cliMjs = File(alpineDir, "usr/lib/node_modules/@openai/codex/cli.mjs")
+        return cliMjs.exists()
     }
 
     /**
-     * Descarga e instala el bootstrap base y configura DNS / APT para instalación de paquetes.
+     * Descarga e instala Alpine Linux rootfs y configura el entorno para Node.js.
      */
     suspend fun installFullEnvironment(
         prefix: File,
@@ -47,68 +48,179 @@ object NodeInstaller {
     ): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
             val arch = detectArch()
-            val zipUrl = "$BOOTSTRAP_BASE_URL/bootstrap-$arch.zip"
-            val targetZip = File(cacheDir, "bootstrap-$arch.zip")
+            val tarGzName = "alpine-minirootfs-$ALPINE_RELEASE-$arch.tar.gz"
+            val urlStr = "https://dl-cdn.alpinelinux.org/alpine/$ALPINE_VERSION/releases/$arch/$tarGzName"
+            val targetTarGz = File(cacheDir, tarGzName)
+            val alpineDir = File(prefix, "alpine")
 
-            onProgress("Descargando sistema base ($arch)...")
+            onProgress("Descargando Alpine Linux ($arch)...")
             var lastReportedPct = -1
-            downloadFile(zipUrl, targetZip) { pct ->
+            downloadFile(urlStr, targetTarGz) { pct ->
                 if (pct % 25 == 0 && pct != lastReportedPct) {
                     lastReportedPct = pct
-                    onProgress("Descargando sistema base: $pct%")
+                    onProgress("Descargando Alpine Linux: $pct%")
                 }
             }
 
-            onProgress("Extrayendo paquetes base...")
-            prefix.mkdirs()
-            unzip(targetZip, prefix)
-            targetZip.delete()
+            onProgress("Extrayendo sistema Linux...")
+            alpineDir.mkdirs()
+            extractTarGz(targetTarGz, alpineDir)
+            targetTarGz.delete()
 
-            onProgress("Configurando symlinks y permisos...")
-            applySymlinks(prefix)
-            setPermissions(prefix)
+            onProgress("Configurando DNS y repositorios...")
+            configureAlpine(alpineDir, prefix, arch)
 
-            onProgress("Configurando DNS y repositorios APT...")
-            configureAptAndDns(prefix)
-
-            onProgress("Sistema base configurado con exito.")
+            onProgress("Sistema base Linux instalado correctamente.")
         }
     }
 
-    fun configureAptAndDns(prefix: File) {
-        val etc = File(prefix, "etc").apply { mkdirs() }
-        val aptDir = File(etc, "apt").apply { mkdirs() }
-        File(aptDir, "trusted.gpg.d").mkdirs()
-
-        // DNS resolver para Bionic libc
+    private fun configureAlpine(alpineDir: File, prefix: File, arch: String) {
+        val etc = File(alpineDir, "etc").apply { mkdirs() }
         val resolv = File(etc, "resolv.conf")
         resolv.writeText("nameserver 8.8.8.8\nnameserver 1.1.1.1\n")
 
-        // Repositorio de paquetes
-        val sources = File(aptDir, "sources.list")
-        sources.writeText("deb https://packages.termux.dev/apt/termux-main stable main\n")
+        val apkDir = File(etc, "apk").apply { mkdirs() }
+        val repos = File(apkDir, "repositories")
+        repos.writeText("https://dl-cdn.alpinelinux.org/alpine/$ALPINE_VERSION/main\nhttps://dl-cdn.alpinelinux.org/alpine/$ALPINE_VERSION/community\n")
 
-        // Configuracion de rutas para apt
-        val aptConf = File(aptDir, "apt.conf")
-        aptConf.writeText("""
-            Dir "${prefix.absolutePath}";
-            Dir::State "${prefix.absolutePath}/var/lib/apt";
-            Dir::State::status "${prefix.absolutePath}/var/lib/dpkg/status";
-            Dir::Cache "${prefix.absolutePath}/var/cache/apt";
-            Dir::Etc "${prefix.absolutePath}/etc/apt";
-            Acquire::Languages "none";
+        val binDir = File(prefix, "bin").apply { mkdirs() }
+        val muslLinker = if (arch == "aarch64") "ld-musl-aarch64.so.1" else "ld-musl-x86_64.so.1"
+        val linkerPath = File(alpineDir, "lib/$muslLinker").absolutePath
+        val libPath = "${File(alpineDir, "lib").absolutePath}:${File(alpineDir, "usr/lib").absolutePath}"
+
+        // Wrapper de ejecucion para Alpine shell
+        val alpineSh = File(binDir, "alpine-sh")
+        alpineSh.writeText("""
+            #!/system/bin/sh
+            exec "$linkerPath" --library-path "$libPath" "${File(alpineDir, "bin/sh").absolutePath}" "${'$'}@"
         """.trimIndent() + "\n")
+        alpineSh.setExecutable(true, false)
 
-        // Estructura de estado de dpkg y apt
-        val dpkgDir = File(prefix, "var/lib/dpkg").apply { mkdirs() }
-        File(dpkgDir, "info").mkdirs()
-        File(dpkgDir, "updates").mkdirs()
-        val dpkgStatus = File(dpkgDir, "status")
-        if (!dpkgStatus.exists()) dpkgStatus.writeText("")
+        // Wrapper de ejecucion para Node
+        val nodeWrapper = File(binDir, "node")
+        nodeWrapper.writeText("""
+            #!/system/bin/sh
+            if [ -f "${File(alpineDir, "usr/bin/node").absolutePath}" ]; then
+                exec "$linkerPath" --library-path "$libPath" "${File(alpineDir, "usr/bin/node").absolutePath}" "${'$'}@"
+            else
+                echo "Node.js no esta instalado aun en Alpine. Ejecuta 'setup-environment'."
+            fi
+        """.trimIndent() + "\n")
+        nodeWrapper.setExecutable(true, false)
 
-        File(prefix, "var/lib/apt/lists/partial").mkdirs()
-        File(prefix, "var/cache/apt/archives/partial").mkdirs()
-        File(prefix, "tmp").mkdirs()
+        // Wrapper de ejecucion para npm
+        val npmWrapper = File(binDir, "npm")
+        npmWrapper.writeText("""
+            #!/system/bin/sh
+            if [ -f "${File(alpineDir, "usr/bin/node").absolutePath}" ]; then
+                exec "$linkerPath" --library-path "$libPath" "${File(alpineDir, "usr/bin/node").absolutePath}" "${File(alpineDir, "usr/lib/node_modules/npm/bin/npm-cli.js").absolutePath}" "${'$'}@"
+            else
+                echo "npm no esta instalado aun. Ejecuta 'setup-environment'."
+            fi
+        """.trimIndent() + "\n")
+        npmWrapper.setExecutable(true, false)
+
+        // Wrapper de ejecucion para Claude Code CLI
+        val claudeWrapper = File(binDir, "claude")
+        claudeWrapper.writeText("""
+            #!/system/bin/sh
+            CLI_PATH="${File(alpineDir, "usr/lib/node_modules/@anthropic-ai/claude-code/cli.mjs").absolutePath}"
+            if [ -f "${'$'}CLI_PATH" ]; then
+                exec "$linkerPath" --library-path "$libPath" "${File(alpineDir, "usr/bin/node").absolutePath}" "${'$'}CLI_PATH" "${'$'}@"
+            else
+                echo "Claude Code CLI (@anthropic-ai/claude-code) no esta instalado aun. Ejecuta 'setup-environment'."
+            fi
+        """.trimIndent() + "\n")
+        claudeWrapper.setExecutable(true, false)
+
+        // Wrapper de ejecucion para Codex CLI
+        val codexWrapper = File(binDir, "codex")
+        codexWrapper.writeText("""
+            #!/system/bin/sh
+            CLI_PATH="${File(alpineDir, "usr/lib/node_modules/@openai/codex/cli.mjs").absolutePath}"
+            if [ -f "${'$'}CLI_PATH" ]; then
+                exec "$linkerPath" --library-path "$libPath" "${File(alpineDir, "usr/bin/node").absolutePath}" "${'$'}CLI_PATH" "${'$'}@"
+            else
+                echo "Codex CLI (@openai/codex) no esta instalado aun. Ejecuta 'setup-environment'."
+            fi
+        """.trimIndent() + "\n")
+        codexWrapper.setExecutable(true, false)
+
+        // Dar permisos de ejecucion a todos los binarios dentro de Alpine
+        listOf(
+            File(alpineDir, "bin"),
+            File(alpineDir, "sbin"),
+            File(alpineDir, "usr/bin"),
+            File(alpineDir, "usr/sbin"),
+            File(alpineDir, "lib"),
+        ).forEach { dir ->
+            if (dir.exists()) {
+                dir.walkTopDown().forEach { f ->
+                    if (f.isFile) {
+                        f.setExecutable(true, false)
+                        f.setReadable(true, false)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun extractTarGz(tarGzFile: File, targetDir: File) {
+        targetDir.mkdirs()
+        GZIPInputStream(BufferedInputStream(tarGzFile.inputStream())).use { gzipIn ->
+            val header = ByteArray(512)
+            while (true) {
+                var read = 0
+                while (read < 512) {
+                    val n = gzipIn.read(header, read, 512 - read)
+                    if (n <= 0) break
+                    read += n
+                }
+                if (read < 512) break
+                if (header.all { it.toInt() == 0 }) break
+
+                val name = String(header, 0, 100).trim { it <= ' ' || it == '\u0000' }
+                if (name.isBlank()) continue
+
+                val sizeStr = String(header, 124, 12).trim { it <= ' ' || it == '\u0000' }
+                val size = if (sizeStr.isNotEmpty()) sizeStr.toLong(8) else 0L
+                val typeFlag = header[156].toInt().toChar()
+
+                val entryFile = File(targetDir, name)
+                if (typeFlag == '5' || name.endsWith("/")) {
+                    entryFile.mkdirs()
+                } else if (typeFlag == '2') {
+                    val linkTarget = String(header, 157, 100).trim { it <= ' ' || it == '\u0000' }
+                    entryFile.parentFile?.mkdirs()
+                    entryFile.delete()
+                    runCatching { Os.symlink(linkTarget, entryFile.absolutePath) }
+                } else if (typeFlag == '0' || typeFlag == '\u0000') {
+                    entryFile.parentFile?.mkdirs()
+                    FileOutputStream(entryFile).use { out ->
+                        var remaining = size
+                        val buf = ByteArray(8192)
+                        while (remaining > 0) {
+                            val toRead = minOf(buf.size.toLong(), remaining).toInt()
+                            val n = gzipIn.read(buf, 0, toRead)
+                            if (n <= 0) break
+                            out.write(buf, 0, n)
+                            remaining -= n
+                        }
+                    }
+                    val pad = (512 - (size % 512)) % 512
+                    if (pad > 0) {
+                        var padRemaining = pad
+                        while (padRemaining > 0) {
+                            val skipped = gzipIn.read(ByteArray(padRemaining.toInt()))
+                            if (skipped <= 0) break
+                            padRemaining -= skipped
+                        }
+                    }
+                    entryFile.setExecutable(true, false)
+                    entryFile.setReadable(true, false)
+                }
+            }
+        }
     }
 
     private fun detectArch(): String {
@@ -116,8 +228,8 @@ object NodeInstaller {
         return when {
             primaryAbi.contains("arm64") || primaryAbi.contains("aarch64") -> "aarch64"
             primaryAbi.contains("x86_64") || primaryAbi.contains("amd64") -> "x86_64"
-            primaryAbi.contains("arm") -> "arm"
-            primaryAbi.contains("x86") || primaryAbi.contains("i686") -> "i686"
+            primaryAbi.contains("arm") -> "armv7"
+            primaryAbi.contains("x86") || primaryAbi.contains("i686") -> "x86"
             else -> "aarch64"
         }
     }
@@ -165,61 +277,5 @@ object NodeInstaller {
             }
         }
         conn.disconnect()
-    }
-
-    private fun unzip(zipFile: File, targetDir: File) {
-        ZipInputStream(BufferedInputStream(zipFile.inputStream())).use { zis ->
-            var entry = zis.nextEntry
-            while (entry != null) {
-                val file = File(targetDir, entry.name)
-                if (entry.isDirectory) {
-                    file.mkdirs()
-                } else {
-                    file.parentFile?.mkdirs()
-                    FileOutputStream(file).use { fos ->
-                        zis.copyTo(fos)
-                    }
-                }
-                zis.closeEntry()
-                entry = zis.nextEntry
-            }
-        }
-    }
-
-    private fun applySymlinks(prefix: File) {
-        val symlinksFile = File(prefix, "SYMLINKS.txt")
-        if (!symlinksFile.exists()) return
-
-        symlinksFile.forEachLine { line ->
-            val parts = line.split("←")
-            if (parts.size == 2) {
-                val target = parts[0].trim()
-                val symlinkRel = parts[1].trim().removePrefix("./")
-                val symlinkFile = File(prefix, symlinkRel)
-                symlinkFile.parentFile?.mkdirs()
-                symlinkFile.delete()
-                runCatching {
-                    Os.symlink(target, symlinkFile.absolutePath)
-                }
-            }
-        }
-        symlinksFile.delete()
-    }
-
-    private fun setPermissions(prefix: File) {
-        listOf(
-            File(prefix, "bin"),
-            File(prefix, "libexec"),
-            File(prefix, "lib/apt/methods"),
-        ).forEach { dir ->
-            if (dir.exists()) {
-                dir.walkTopDown().forEach { f ->
-                    if (f.isFile) {
-                        f.setExecutable(true, false)
-                        f.setReadable(true, false)
-                    }
-                }
-            }
-        }
     }
 }
