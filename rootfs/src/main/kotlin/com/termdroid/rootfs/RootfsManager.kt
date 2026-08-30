@@ -86,6 +86,17 @@ class RootfsManager(
                 #!/system/bin/sh
                 termdroid tts "${'$'}*"
             """.trimIndent() + "\n",
+            "xdg-open" to """
+                #!/system/bin/sh
+                URL="${'$'}1"
+                if [ -n "${'$'}URL" ]; then
+                    am start -a android.intent.action.VIEW -d "${'$'}URL" >/dev/null 2>&1 || echo "Enlace: ${'$'}URL"
+                fi
+            """.trimIndent() + "\n",
+            "open-url" to """
+                #!/system/bin/sh
+                am start -a android.intent.action.VIEW -d "${'$'}1" >/dev/null 2>&1
+            """.trimIndent() + "\n",
         )
 
         helpers.forEach { (name, script) ->
@@ -175,6 +186,12 @@ class RootfsManager(
             install-node() {
                 sh "${binDir.absolutePath}/setup-alpine" "${'$'}@"
             }
+            xdg-open() {
+                am start -a android.intent.action.VIEW -d "${'$'}1" >/dev/null 2>&1
+            }
+            open-url() {
+                am start -a android.intent.action.VIEW -d "${'$'}1" >/dev/null 2>&1
+            }
             rg() {
                 "${nativeLibDir.absolutePath}/librg.so" "${'$'}@"
             }
@@ -211,13 +228,43 @@ class RootfsManager(
         val codexBin = File(binDir, "codex")
         val script = """
             #!/system/bin/sh
-            echo "=== Termdroid Codex Helper ==="
-            echo "Para usar Codex / ChatGPT con tu suscripcion Plus/Pro:"
-            echo "1. Cambia a la pestana 'Chat' (arriba)."
-            echo "2. Toca '⚡ Proveedor' y selecciona 'OpenAI / Codex'."
-            echo "3. Ingresa tu token de sesion de ChatGPT y listo!"
-            echo ""
-            echo "Si deseas usar herramientas CLI en la terminal, ejecuta 'setup-alpine'."
+            case "${'$'}1" in
+                login|auth)
+                    echo "==========================================="
+                    echo " 🟢 Codex / ChatGPT Login"
+                    echo "==========================================="
+                    echo "Abriendo tu navegador (Brave) para autenticar..."
+                    am start -a android.intent.action.VIEW -d "https://chatgpt.com/api/auth/session" >/dev/null 2>&1
+                    echo ""
+                    echo "1. Inicia sesion en ChatGPT en tu navegador."
+                    echo "2. Copia tu token de sesion de ChatGPT."
+                    echo "3. Pegalo aqui abajo:"
+                    printf "Token: "
+                    read token
+                    if [ -n "${'$'}token" ]; then
+                        mkdir -p "${'$'}HOME/.codex"
+                        echo "{\"accessToken\":\"${'$'}token\",\"provider\":\"openai\"}" > "${'$'}HOME/.codex/auth.json"
+                        echo ""
+                        echo "✅ Autenticado correctamente con Codex / ChatGPT!"
+                        echo "Guardado en ~/.codex/auth.json"
+                    else
+                        echo "Cancelado."
+                    fi
+                    ;;
+                *)
+                    echo "=== Termdroid Codex Helper ==="
+                    echo "Comandos:"
+                    echo "  codex login   -> Iniciar sesion abriendo Brave/navegador"
+                    echo ""
+                    if [ -f "${'$'}HOME/.codex/auth.json" ]; then
+                        echo "Estado: Sesion guardada en ~/.codex/auth.json"
+                    else
+                        echo "Estado: No autenticado. Ejecuta 'codex login'."
+                    fi
+                    echo ""
+                    echo "Tip: Tambien podes chatear directamente en la pestana 'Chat'."
+                    ;;
+            esac
         """.trimIndent() + "\n"
         codexBin.writeText(script)
         codexBin.setExecutable(true, false)
@@ -246,21 +293,49 @@ class RootfsManager(
             export NODE_PATH="${libDir.absolutePath}/node_modules"
             export TMPDIR="${tmpDir.absolutePath}"
 
-            if [ -f "${libDir.absolutePath}/node_modules/@anthropic-ai/claude-code/cli.mjs" ]; then
-                exec "${binDir.absolutePath}/node" "${libDir.absolutePath}/node_modules/@anthropic-ai/claude-code/cli.mjs" "$@"
-            elif [ -f "${binDir.absolutePath}/npx" ]; then
-                exec "${binDir.absolutePath}/npx" "@anthropic-ai/claude-code" "$@"
-            else
-                echo "=== Termdroid Claude Helper ==="
-                echo "El comando 'claude' CLI requiere Node.js instalado en el entorno de la terminal."
-                echo ""
-                echo "Opciones disponibles:"
-                echo "1. [RECOMENDADO] Usa la pestana 'Chat' en la barra superior."
-                echo "   Alli el agente ya funciona directamente con tu suscripcion o token."
-                echo "2. Para instalar el CLI en la terminal, ejecuta:"
-                echo "   setup-alpine"
-                exit 0
-            fi
+            case "${'$'}1" in
+                login|auth)
+                    echo "==========================================="
+                    echo " 🟣 Claude Pro / Team Login"
+                    echo "==========================================="
+                    echo "Abriendo tu navegador (Brave) para autenticar..."
+                    am start -a android.intent.action.VIEW -d "https://claude.ai" >/dev/null 2>&1
+                    echo ""
+                    echo "1. Inicia sesion en Claude en tu navegador."
+                    echo "2. Copia tu sessionKey o token de sesion."
+                    echo "3. Pegalo aqui abajo:"
+                    printf "Token / sessionKey: "
+                    read token
+                    if [ -n "${'$'}token" ]; then
+                        mkdir -p "${'$'}HOME/.claude"
+                        echo "{\"sessionKey\":\"${'$'}token\",\"provider\":\"anthropic\"}" > "${'$'}HOME/.claude.json"
+                        echo ""
+                        echo "✅ Autenticado correctamente con Claude!"
+                        echo "Guardado en ~/.claude.json"
+                    else
+                        echo "Cancelado."
+                    fi
+                    ;;
+                *)
+                    if [ -f "${libDir.absolutePath}/node_modules/@anthropic-ai/claude-code/cli.mjs" ]; then
+                        exec "${binDir.absolutePath}/node" "${libDir.absolutePath}/node_modules/@anthropic-ai/claude-code/cli.mjs" "${'$'}@"
+                    elif [ -f "${binDir.absolutePath}/npx" ]; then
+                        exec "${binDir.absolutePath}/npx" "@anthropic-ai/claude-code" "${'$'}@"
+                    else
+                        echo "=== Termdroid Claude Helper ==="
+                        echo "Comandos:"
+                        echo "  claude login  -> Iniciar sesion abriendo Brave/navegador"
+                        echo ""
+                        if [ -f "${'$'}HOME/.claude.json" ]; then
+                            echo "Estado: Sesion guardada en ~/.claude.json"
+                        else
+                            echo "Estado: No autenticado. Ejecuta 'claude login'."
+                        fi
+                        echo ""
+                        echo "Tip: Tambien podes chatear directamente en la pestana 'Chat'."
+                    fi
+                    ;;
+            esac
         """.trimIndent() + "\n"
 
         claudeBin.writeText(script)

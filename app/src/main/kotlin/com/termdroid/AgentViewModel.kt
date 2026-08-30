@@ -102,7 +102,7 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
     init {
         val caps = CapabilityProbe(app).get()
         val currentProvider = runCatching { LlmProvider.valueOf(secrets.activeProvider) }.getOrElse { LlmProvider.GEMINI }
-        val hasCreds = secrets.hasActiveCredentials()
+        val hasCreds = getEffectiveToken(currentProvider).isNotBlank() || currentProvider == LlmProvider.CUSTOM
         _state.update {
             it.copy(
                 caps = caps,
@@ -190,6 +190,40 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(items = emptyList(), tokensIn = 0, tokensOut = 0, cacheRead = 0) }
     }
 
+    private fun getEffectiveToken(provider: LlmProvider): String {
+        val app = getApplication<Application>()
+        return when (provider) {
+            LlmProvider.GEMINI -> secrets.geminiToken.orEmpty()
+            LlmProvider.CLAUDE -> {
+                val stored = secrets.claudeToken.orEmpty()
+                if (stored.isNotBlank()) stored
+                else {
+                    val file = File(app.filesDir, "home/.claude.json")
+                    if (file.exists()) {
+                        runCatching {
+                            val text = file.readText()
+                            org.json.JSONObject(text).optString("sessionKey", "").takeIf { it.isNotBlank() }
+                                ?: org.json.JSONObject(text).optString("primaryApiKey", "")
+                        }.getOrDefault("")
+                    } else ""
+                }
+            }
+            LlmProvider.OPENAI, LlmProvider.CUSTOM -> {
+                val stored = secrets.openaiToken.orEmpty()
+                if (stored.isNotBlank()) stored
+                else {
+                    val file = File(app.filesDir, "home/.codex/auth.json")
+                    if (file.exists()) {
+                        runCatching {
+                            val text = file.readText()
+                            org.json.JSONObject(text).optString("accessToken", "")
+                        }.getOrDefault("")
+                    } else ""
+                }
+            }
+        }
+    }
+
     fun saveProvider(
         provider: LlmProvider,
         token: String,
@@ -197,10 +231,25 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
         baseUrl: String = "",
     ) {
         secrets.activeProvider = provider.name
+        val app = getApplication<Application>()
         when (provider) {
             LlmProvider.GEMINI -> secrets.geminiToken = token.trim()
-            LlmProvider.CLAUDE -> secrets.claudeToken = token.trim()
-            LlmProvider.OPENAI -> secrets.openaiToken = token.trim()
+            LlmProvider.CLAUDE -> {
+                secrets.claudeToken = token.trim()
+                runCatching {
+                    val f = File(app.filesDir, "home/.claude.json")
+                    f.parentFile?.mkdirs()
+                    f.writeText("{\"sessionKey\":\"${token.trim()}\",\"provider\":\"anthropic\"}\n")
+                }
+            }
+            LlmProvider.OPENAI -> {
+                secrets.openaiToken = token.trim()
+                runCatching {
+                    val f = File(app.filesDir, "home/.codex/auth.json")
+                    f.parentFile?.mkdirs()
+                    f.writeText("{\"accessToken\":\"${token.trim()}\",\"provider\":\"openai\"}\n")
+                }
+            }
             LlmProvider.CUSTOM -> {
                 secrets.customUrl = baseUrl.trim()
                 secrets.customModel = model.trim()
@@ -212,7 +261,7 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
         sessions.load(sessionId)?.let { loop?.restore(it.messages) }
         _state.update {
             it.copy(
-                needsApiKey = !secrets.hasActiveCredentials(),
+                needsApiKey = getEffectiveToken(provider).isBlank() && provider != LlmProvider.CUSTOM,
                 activeProvider = provider,
                 showSettings = false,
             )
@@ -240,12 +289,7 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun buildLoop(caps: DeviceCapabilities) {
         val provider = runCatching { LlmProvider.valueOf(secrets.activeProvider) }.getOrElse { LlmProvider.GEMINI }
-        val token = when (provider) {
-            LlmProvider.GEMINI -> secrets.geminiToken.orEmpty()
-            LlmProvider.CLAUDE -> secrets.claudeToken.orEmpty()
-            LlmProvider.OPENAI -> secrets.openaiToken.orEmpty()
-            LlmProvider.CUSTOM -> secrets.openaiToken.orEmpty()
-        }
+        val token = getEffectiveToken(provider)
         val model = when (provider) {
             LlmProvider.CUSTOM -> secrets.customModel.orEmpty()
             else -> ""
