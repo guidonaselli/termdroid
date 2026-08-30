@@ -11,8 +11,8 @@ import java.net.Socket
 
 class AdbLiveHandshakeTest {
 
-    private val host = System.getProperty("adb.host", "127.0.0.1")
-    private val port = System.getProperty("adb.port", "5555").toInt()
+    private val host: String = System.getProperty("adb.host") ?: "127.0.0.1"
+    private val port: Int = System.getProperty("adb.port")?.toIntOrNull() ?: 5555
 
     private fun adbdVivo(): Boolean = runCatching {
         val destino = InetSocketAddress(host, port)

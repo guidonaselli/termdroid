@@ -52,15 +52,19 @@ class ShellSession(
             com.termdroid.exec.Executor(env, backend).buildArgv(shell)
         }
 
+        val homeDir = File(context.filesDir, "home").apply { mkdirs() }
         val session = PtySession.start(
             argv = argv,
             env = mapOf(
-                "PATH" to "${env.prefix}/bin:/system/bin:/system/xbin",
-                "HOME" to context.filesDir.absolutePath,
+                "PATH" to "${env.prefix}/bin:${env.nativeLibDir.absolutePath}:/system/bin:/system/xbin",
+                "HOME" to homeDir.absolutePath,
                 "TERM" to "xterm-256color",
                 "TMPDIR" to context.cacheDir.absolutePath,
+                "PREFIX" to env.prefix.absolutePath,
+                "LD_LIBRARY_PATH" to "${env.prefix}/lib:${env.nativeLibDir.absolutePath}",
+                "NODE_PATH" to "${env.prefix}/lib/node_modules",
             ),
-            cwd = context.filesDir,
+            cwd = homeDir,
             rows = rows,
             cols = cols,
         )

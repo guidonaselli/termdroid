@@ -9,9 +9,9 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -41,7 +41,7 @@ class MainActivity : ComponentActivity() {
                     Column(Modifier.padding(inner)) {
                         var tab by remember { mutableIntStateOf(0) }
 
-                        TabRow(selectedTabIndex = tab) {
+                        PrimaryTabRow(selectedTabIndex = tab) {
                             Tab(tab == 0, onClick = { tab = 0 }, text = { Text("Chat") })
                             Tab(tab == 1, onClick = { tab = 1 }, text = { Text("Terminal") })
                         }

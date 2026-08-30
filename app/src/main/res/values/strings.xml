@@ -1,5 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="agente_trabajando">El agente esta trabajando</string>
-    <string name="cancelar">Cancelar</string>
+    <string name="app_name">Termdroid</string>
+    <string name="tab_chat">Chat</string>
+    <string name="tab_terminal">Terminal</string>
+    <string name="agente_trabajando">The agent is working</string>
+    <string name="cancelar">Cancel</string>
+    <string name="enviar">Send</string>
+    <string name="parar">Stop</string>
+    <string name="pedile_algo">Ask something…</string>
+    <string name="nueva_sesion">New session</string>
+    <string name="aprobacion_requerida">Approval required</string>
+    <string name="aprobar">Approve</string>
+    <string name="rechazar">Reject</string>
+    <string name="modo_preguntar">Ask all</string>
+    <string name="modo_auto_read">Auto read</string>
+    <string name="modo_auto_all">Auto all</string>
+    <string name="terminal_no_disponible">This device cannot open a shell.</string>
+    <string name="terminal_nueva">New</string>
+    <string name="api_key_titulo">Anthropic API Key</string>
+    <string name="api_key_explicacion">Enter your API key to use the native mobile agent. If you only want to use Claude Code CLI in the Terminal with OAuth login, switch to the Terminal tab.</string>
+    <string name="api_key_guardar">Save API Key</string>
+    <string name="acceso_requerido">Permission required</string>
+    <string name="abrir_ajustes">Open Settings</string>
+    <string name="ahora_no">Not now</string>
+    <string name="tile_label">Termdroid</string>
 </resources>

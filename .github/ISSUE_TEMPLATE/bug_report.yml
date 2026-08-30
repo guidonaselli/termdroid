@@ -1,0 +1,32 @@
+name: 🐛 Bug Report
+description: Report an issue or bug in Termdroid
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting an issue! Please describe the problem clearly.
+  - type: input
+    id: device
+    attributes:
+      label: Device & Android Version
+      description: e.g. Pixel 8, Samsung S23 (Android 14)
+      placeholder: Device model and Android version
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce this behavior?
+      placeholder: |
+        1. Open Termdroid
+        2. Run command ...
+        3. See error
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs or Error Output
+      description: Paste any terminal or logcat output here.
+      render: shell

@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.Process
 import android.os.StatFs
 import android.provider.Settings
+import com.termdroid.adb.AdbClient
 import com.termdroid.agent.AgentTool
 import com.termdroid.agent.ToolOutcome
 import com.termdroid.agent.ToolRisk
@@ -34,6 +35,7 @@ enum class SpecialAccess(val label: String) {
     fun isGranted(context: Context): Boolean = when (this) {
         USAGE_STATS -> {
             val ops = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+            @Suppress("DEPRECATION")
             val mode = ops.unsafeCheckOpNoThrow(
                 AppOpsManager.OPSTR_GET_USAGE_STATS,
                 Process.myUid(),
@@ -54,6 +56,8 @@ enum class SpecialAccess(val label: String) {
 /** Tools que leen el propio Android. */
 class AndroidToolset(
     private val context: Context,
+    private val adbHost: String = "127.0.0.1",
+    private val adbPort: Int = 5555,
     private val onAccessNeeded: (SpecialAccess) -> Unit = {},
 ) {
     init {
@@ -61,7 +65,7 @@ class AndroidToolset(
     }
 
     fun all(): List<AgentTool> =
-        listOf(ListAppsTool(), AppUsageTool(), DeviceStateTool(), NotificationsTool())
+        listOf(ListAppsTool(), AppUsageTool(), DeviceStateTool(), NotificationsTool(), ShellPrivTool())
 
     private fun requireAccess(access: SpecialAccess): ToolOutcome? {
         if (access.isGranted(context)) return null
@@ -242,6 +246,44 @@ class AndroidToolset(
                         .toString(2),
                 )
             }.getOrElse { ToolOutcome("No se pudo leer el estado: $it", isError = true) }
+        }
+    }
+
+    private inner class ShellPrivTool : AgentTool {
+        override val spec = ToolSpec(
+            name = "shell_priv",
+            description = "Ejecuta un comando con permisos de UID shell (2000) a traves del canal ADB embebido.",
+            inputSchema = objectSchema(
+                "command" to stringProp("Comando privilegiado a ejecutar."),
+                required = listOf("command"),
+            ),
+        )
+        override val risk = ToolRisk.PRIVILEGED
+
+        override fun describe(input: JSONObject) = "adb shell: ${input.optString("command")}"
+
+        override suspend fun execute(input: JSONObject): ToolOutcome = withContext(Dispatchers.IO) {
+            val cmd = input.optString("command").ifBlank {
+                return@withContext ToolOutcome("Falta 'command'.", isError = true)
+            }
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+                return@withContext ToolOutcome(
+                    "El canal ADB embebido requiere Android 11 o superior (depuracion inalambrica). " +
+                        "En este device (API ${Build.VERSION.SDK_INT}) no esta disponible sin una PC.",
+                    isError = true,
+                )
+            }
+            runCatching {
+                val client = AdbClient(host = adbHost, port = adbPort)
+                val res = client.execute(cmd)
+                ToolOutcome(res.output.ifBlank { "[sin salida]" }, isError = res.isError)
+            }.getOrElse {
+                ToolOutcome(
+                    "No se pudo conectar con el canal ADB ($adbHost:$adbPort). " +
+                        "Verifica que la depuracion inalambrica este activa: $it",
+                    isError = true,
+                )
+            }
         }
     }
 }

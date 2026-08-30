@@ -1,0 +1,21 @@
+name: 💡 Feature Request
+description: Propose a new feature or improvement for Termdroid
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: Share your idea to make Termdroid even better!
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or Use Case
+      description: What problem does this feature solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Solution
+      description: Describe how this feature should work.
+    validations:
+      required: true

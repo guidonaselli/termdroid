@@ -90,9 +90,14 @@ class AndroidToolsetTest {
         assertTrue(SpecialAccess.USAGE_STATS.label.isNotBlank())
     }
 
-    /** Todo esto solo lee: nada de aca puede pedir aprobacion como si escribiera. */
     @Test
-    fun todasLasToolsDeAndroidSonDeLectura() {
-        tools.values.forEach { assertEquals(it.spec.name, ToolRisk.READ, it.risk) }
+    fun shellPrivEsPrivilegiadoYElRestoDeLectura() {
+        tools.values.forEach { tool ->
+            if (tool.spec.name == "shell_priv") {
+                assertEquals(ToolRisk.PRIVILEGED, tool.risk)
+            } else {
+                assertEquals(tool.spec.name, ToolRisk.READ, tool.risk)
+            }
+        }
     }
 }

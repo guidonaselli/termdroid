@@ -5,16 +5,21 @@ import android.os.Build
 import java.io.File
 
 /** Rutas fijas del entorno de ejecucion de esta app en este device. */
-class ExecEnvironment(context: Context) {
-    val nativeLibDir: File = File(context.applicationInfo.nativeLibraryDir)
-    val filesDir: File = context.filesDir
+class ExecEnvironment(
+    val nativeLibDir: File,
+    val filesDir: File,
+) {
+    constructor(context: Context) : this(
+        File(context.applicationInfo.nativeLibraryDir ?: ""),
+        context.filesDir ?: File(""),
+    )
 
     /** Raiz del rootfs. Equivale al prefix de un sistema Unix. */
     val prefix: File = File(filesDir, "usr")
 
     /** El interprete dinamico de Android para esta ABI. */
     val linker: File = File(
-        if (Build.SUPPORTED_64_BIT_ABIS.isNotEmpty()) "/system/bin/linker64" else "/system/bin/linker",
+        if (Build.SUPPORTED_64_BIT_ABIS?.isNotEmpty() == true) "/system/bin/linker64" else "/system/bin/linker",
     )
 
     /** Ruta del binario del bootstrap que viaja en el APK. */

@@ -15,7 +15,7 @@ android {
 
     sourceSets {
         getByName("main") {
-            jniLibs.srcDirs("prebuilt")
+            jniLibs.directories.add("prebuilt")
         }
     }
 
@@ -33,5 +33,8 @@ android {
 
 dependencies {
     implementation(libs.androidx.core.ktx)
+    implementation(libs.kotlinx.coroutines.android)
     api(project(":exec"))
+
+    testImplementation(libs.junit)
 }

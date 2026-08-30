@@ -22,6 +22,7 @@ class TerminalViewModel(app: Application) : AndroidViewModel(app) {
     val active: ShellSession? get() = _sessions.value.getOrNull(_activeIndex.value)
 
     init {
+        com.termdroid.rootfs.RootfsManager(app).ensureBaseEnvironment()
         if (capabilities.hasShell) nueva()
     }
 
