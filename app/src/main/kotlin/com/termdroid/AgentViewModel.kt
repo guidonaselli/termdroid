@@ -190,6 +190,38 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(items = emptyList(), tokensIn = 0, tokensOut = 0, cacheRead = 0) }
     }
 
+    fun refreshCredentials() {
+        val app = getApplication<Application>()
+        val caps = _state.value.caps ?: CapabilityProbe(app).get()
+        val claudeFile = File(app.filesDir, "home/.claude.json")
+        val codexFile = File(app.filesDir, "home/.codex/auth.json")
+
+        var currentProvider = runCatching { LlmProvider.valueOf(secrets.activeProvider) }.getOrElse { LlmProvider.GEMINI }
+        if (secrets.activeProvider.isBlank() || (getEffectiveToken(currentProvider).isBlank() && currentProvider != LlmProvider.CUSTOM)) {
+            if (claudeFile.exists()) {
+                currentProvider = LlmProvider.CLAUDE
+                secrets.activeProvider = LlmProvider.CLAUDE.name
+            } else if (codexFile.exists()) {
+                currentProvider = LlmProvider.OPENAI
+                secrets.activeProvider = LlmProvider.OPENAI.name
+            }
+        }
+
+        val token = getEffectiveToken(currentProvider)
+        val hasCreds = token.isNotBlank() || currentProvider == LlmProvider.CUSTOM
+
+        _state.update {
+            it.copy(
+                caps = caps,
+                needsApiKey = !hasCreds,
+                activeProvider = currentProvider,
+            )
+        }
+        if (hasCreds) {
+            buildLoop(caps)
+        }
+    }
+
     private fun getEffectiveToken(provider: LlmProvider): String {
         val app = getApplication<Application>()
         return when (provider) {

@@ -290,6 +290,12 @@ class RootfsManager(
         val codexBin = File(binDir, "codex")
         val script = """
             #!/system/bin/sh
+            export PREFIX="${prefix.absolutePath}"
+            export HOME="${homeDir.absolutePath}"
+            export PATH="${binDir.absolutePath}:${prefix.absolutePath}/alpine/usr/bin:${nativeLibDir.absolutePath}:/system/bin:/system/xbin"
+            export NODE_PATH="${libDir.absolutePath}/node_modules:${prefix.absolutePath}/alpine/usr/lib/node_modules"
+            export TMPDIR="${tmpDir.absolutePath}"
+
             case "${'$'}1" in
                 login|auth)
                     echo "==========================================="
@@ -314,25 +320,33 @@ class RootfsManager(
                     fi
                     ;;
                 *)
-                    echo "=== Termdroid Codex Helper ==="
-                    if [ -f "${'$'}HOME/.codex/auth.json" ]; then
-                        echo "🟢 Estado: Sesion activa en ~/.codex/auth.json"
-                        echo "Comandos disponibles:"
-                        echo "  codex login   -> Re-autenticar o cambiar cuenta"
-                        echo ""
-                        echo "Tip: El agente ya esta conectado en la pestana 'Chat'."
+                    if [ -f "${libDir.absolutePath}/node_modules/@openai/codex/cli.mjs" ]; then
+                        exec "${binDir.absolutePath}/node" "${libDir.absolutePath}/node_modules/@openai/codex/cli.mjs" "${'$'}@"
+                    elif which codex-cli >/dev/null 2>&1; then
+                        exec codex-cli "${'$'}@"
+                    elif which npx >/dev/null 2>&1; then
+                        exec "${binDir.absolutePath}/npx" "codex" "${'$'}@"
                     else
-                        echo "🟡 Estado: No autenticado."
-                        printf "¿Deseas abrir Brave para iniciar sesion ahora? (s/n): "
-                        read resp
-                        case "${'$'}resp" in
-                            s|S|y|Y)
-                                sh "${binDir.absolutePath}/codex" login
-                                ;;
-                            *)
-                                echo "Podes iniciar sesion en cualquier momento con 'codex login'."
-                                ;;
-                        esac
+                        echo "=== Termdroid Codex CLI ==="
+                        if [ -f "${'$'}HOME/.codex/auth.json" ]; then
+                            echo "🟢 Estado: Sesion guardada en ~/.codex/auth.json"
+                            printf "¿Deseas instalar el entorno Node.js para ejecutar Codex CLI en terminal? (s/n): "
+                            read resp
+                            case "${'$'}resp" in
+                                s|S|y|Y)
+                                    sh "${binDir.absolutePath}/setup-alpine"
+                                    ;;
+                            esac
+                        else
+                            echo "🟡 Estado: No autenticado."
+                            printf "¿Deseas abrir Brave para iniciar sesion ahora? (s/n): "
+                            read resp
+                            case "${'$'}resp" in
+                                s|S|y|Y)
+                                    sh "${binDir.absolutePath}/codex" login
+                                    ;;
+                            esac
+                        fi
                     fi
                     ;;
             esac
@@ -360,8 +374,8 @@ class RootfsManager(
             #!/system/bin/sh
             export PREFIX="${prefix.absolutePath}"
             export HOME="${homeDir.absolutePath}"
-            export PATH="${binDir.absolutePath}:${nativeLibDir.absolutePath}:/system/bin:/system/xbin"
-            export NODE_PATH="${libDir.absolutePath}/node_modules"
+            export PATH="${binDir.absolutePath}:${prefix.absolutePath}/alpine/usr/bin:${nativeLibDir.absolutePath}:/system/bin:/system/xbin"
+            export NODE_PATH="${libDir.absolutePath}/node_modules:${prefix.absolutePath}/alpine/usr/lib/node_modules"
             export TMPDIR="${tmpDir.absolutePath}"
 
             case "${'$'}1" in
@@ -390,17 +404,23 @@ class RootfsManager(
                 *)
                     if [ -f "${libDir.absolutePath}/node_modules/@anthropic-ai/claude-code/cli.mjs" ]; then
                         exec "${binDir.absolutePath}/node" "${libDir.absolutePath}/node_modules/@anthropic-ai/claude-code/cli.mjs" "${'$'}@"
-                    elif [ -f "${binDir.absolutePath}/npx" ]; then
-                        exec "${binDir.absolutePath}/npx" "@anthropic-ai/claude-code" "${'$'}@"
+                    elif which claude-code >/dev/null 2>&1; then
+                        exec claude-code "${'$'}@"
+                    elif [ -f "${prefix.absolutePath}/alpine/usr/bin/npx" ]; then
+                        exec "${prefix.absolutePath}/alpine/usr/bin/npx" "@anthropic-ai/claude-code" "${'$'}@"
+                    elif which npx >/dev/null 2>&1; then
+                        exec npx "@anthropic-ai/claude-code" "${'$'}@"
                     else
-                        echo "=== Termdroid Claude Helper ==="
+                        echo "=== Termdroid Claude Code CLI ==="
                         if [ -f "${'$'}HOME/.claude.json" ]; then
                             echo "🟣 Estado: Sesion guardada en ~/.claude.json"
-                            echo "Comandos disponibles:"
-                            echo "  claude login   -> Re-autenticar o cambiar token"
-                            echo "  setup-alpine   -> Instalar Node.js para CLI nativo"
-                            echo ""
-                            echo "Tip: El agente ya esta conectado en la pestana 'Chat'."
+                            printf "¿Deseas instalar Node.js para ejecutar Claude Code CLI oficial? (s/n): "
+                            read resp
+                            case "${'$'}resp" in
+                                s|S|y|Y)
+                                    sh "${binDir.absolutePath}/setup-alpine"
+                                    ;;
+                            esac
                         else
                             echo "🟡 Estado: No autenticado."
                             printf "¿Deseas abrir Brave para iniciar sesion ahora? (s/n): "
@@ -408,9 +428,6 @@ class RootfsManager(
                             case "${'$'}resp" in
                                 s|S|y|Y)
                                     sh "${binDir.absolutePath}/claude" login
-                                    ;;
-                                *)
-                                    echo "Podes iniciar sesion en cualquier momento con 'claude login'."
                                     ;;
                             esac
                         fi
