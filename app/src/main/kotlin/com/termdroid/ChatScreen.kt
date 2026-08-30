@@ -105,7 +105,7 @@ fun ChatScreen(vm: AgentViewModel, modifier: Modifier = Modifier) {
                 value = input,
                 onValueChange = { input = it },
                 modifier = Modifier.weight(1f),
-                placeholder = { Text("Pedile algo") },
+                placeholder = { Text(androidx.compose.ui.res.stringResource(R.string.pedile_algo)) },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(
                     onSend = {
@@ -117,14 +117,14 @@ fun ChatScreen(vm: AgentViewModel, modifier: Modifier = Modifier) {
             DictadoButton(onTexto = { input = (input + " " + it).trim() })
 
             if (state.busy) {
-                OutlinedButton(onClick = vm::cancel) { Text("Parar") }
+                OutlinedButton(onClick = vm::cancel) { Text(androidx.compose.ui.res.stringResource(R.string.parar)) }
             } else {
                 Button(
                     onClick = {
                         vm.send(input)
                         input = ""
                     },
-                ) { Text("Enviar") }
+                ) { Text(androidx.compose.ui.res.stringResource(R.string.enviar)) }
             }
         }
     }
@@ -283,8 +283,8 @@ private fun AccessCard(
                         access.settingsIntent().addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
                     )
                     onDismiss()
-                }) { Text("Abrir Ajustes") }
-                OutlinedButton(onClick = onDismiss) { Text("Ahora no") }
+                }) { Text(androidx.compose.ui.res.stringResource(R.string.abrir_ajustes)) }
+                OutlinedButton(onClick = onDismiss) { Text(androidx.compose.ui.res.stringResource(R.string.ahora_no)) }
             }
         }
     }
@@ -295,7 +295,7 @@ private fun AccessCard(
 internal fun ApprovalCard(pending: PendingApproval, onDecide: (Boolean) -> Unit) {
     Surface(color = MaterialTheme.colorScheme.tertiaryContainer, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("El agente quiere ejecutar ${pending.name}", fontWeight = FontWeight.Bold)
+            Text(androidx.compose.ui.res.stringResource(R.string.aprobacion_requerida) + ": ${pending.name}", fontWeight = FontWeight.Bold)
             Text(
                 pending.description,
                 fontFamily = FontFamily.Monospace,
@@ -303,8 +303,8 @@ internal fun ApprovalCard(pending: PendingApproval, onDecide: (Boolean) -> Unit)
                 modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { onDecide(true) }) { Text("Aprobar") }
-                OutlinedButton(onClick = { onDecide(false) }) { Text("Rechazar") }
+                Button(onClick = { onDecide(true) }) { Text(androidx.compose.ui.res.stringResource(R.string.aprobar)) }
+                OutlinedButton(onClick = { onDecide(false) }) { Text(androidx.compose.ui.res.stringResource(R.string.rechazar)) }
             }
         }
     }
@@ -331,13 +331,18 @@ private fun AutonomyBar(
             modifier = Modifier.horizontalScroll(rememberScrollState()),
         ) {
             AutonomyMode.entries.forEach { m ->
+                val label = when (m) {
+                    AutonomyMode.ASK_ALL -> androidx.compose.ui.res.stringResource(R.string.modo_preguntar)
+                    AutonomyMode.AUTO_READ -> androidx.compose.ui.res.stringResource(R.string.modo_auto_read)
+                    AutonomyMode.AUTO_ALL -> androidx.compose.ui.res.stringResource(R.string.modo_auto_all)
+                }
                 FilterChip(
                     selected = m == mode,
                     onClick = { onMode(m) },
-                    label = { Text(m.label(), fontSize = 12.sp) },
+                    label = { Text(label, fontSize = 12.sp) },
                 )
             }
-            TextButton(onClick = onNueva) { Text("Nueva", fontSize = 12.sp) }
+            TextButton(onClick = onNueva) { Text(androidx.compose.ui.res.stringResource(R.string.nueva_sesion), fontSize = 12.sp) }
         }
         Text(
             "in $tokensIn · out $tokensOut · cache $cacheRead",
@@ -346,19 +351,13 @@ private fun AutonomyBar(
     }
 }
 
-private fun AutonomyMode.label() = when (this) {
-    AutonomyMode.ASK_ALL -> "Preguntar todo"
-    AutonomyMode.AUTO_READ -> "Auto-lectura"
-    AutonomyMode.AUTO_ALL -> "Auto-todo"
-}
-
 @Composable
 private fun ApiKeyPrompt(onSave: (String) -> Unit) {
     var key by remember { mutableStateOf("") }
     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Clave de la API", style = MaterialTheme.typography.titleMedium)
+        Text(androidx.compose.ui.res.stringResource(R.string.api_key_titulo), style = MaterialTheme.typography.titleMedium)
         Text(
-            "Se guarda cifrada con el Keystore del sistema y no sale del telefono.",
+            androidx.compose.ui.res.stringResource(R.string.api_key_explicacion),
             style = MaterialTheme.typography.bodySmall,
         )
         TextField(
@@ -368,6 +367,6 @@ private fun ApiKeyPrompt(onSave: (String) -> Unit) {
             singleLine = true,
             placeholder = { Text("sk-ant-…") },
         )
-        Button(onClick = { onSave(key) }, enabled = key.isNotBlank()) { Text("Guardar") }
+        Button(onClick = { onSave(key) }, enabled = key.isNotBlank()) { Text(androidx.compose.ui.res.stringResource(R.string.api_key_guardar)) }
     }
 }

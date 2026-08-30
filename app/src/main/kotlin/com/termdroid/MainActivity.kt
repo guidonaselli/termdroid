@@ -42,8 +42,8 @@ class MainActivity : ComponentActivity() {
                         var tab by remember { mutableIntStateOf(0) }
 
                         PrimaryTabRow(selectedTabIndex = tab) {
-                            Tab(tab == 0, onClick = { tab = 0 }, text = { Text("Chat") })
-                            Tab(tab == 1, onClick = { tab = 1 }, text = { Text("Terminal") })
+                            Tab(tab == 0, onClick = { tab = 0 }, text = { Text(androidx.compose.ui.res.stringResource(R.string.tab_chat)) })
+                            Tab(tab == 1, onClick = { tab = 1 }, text = { Text(androidx.compose.ui.res.stringResource(R.string.tab_terminal)) })
                         }
 
                         when (tab) {

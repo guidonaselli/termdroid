@@ -48,7 +48,7 @@ fun TerminalScreen(vm: TerminalViewModel, modifier: Modifier = Modifier) {
     val session = sesiones.getOrNull(activa)
 
     if (session == null) {
-        Text("Este device no puede abrir un shell.", modifier = modifier.padding(16.dp))
+        Text(androidx.compose.ui.res.stringResource(R.string.terminal_no_disponible), modifier = modifier.padding(16.dp))
         return
     }
 
