@@ -23,14 +23,14 @@ class OpenAiTransport(
         tools: List<ToolSpec>,
         messages: List<Msg>,
     ): Flow<StreamEvent> = flow {
-        val endpoint = URL("/chat/completions")
+        val endpoint = URL("${baseUrl.removeSuffix("/")}/chat/completions")
         val conn = (endpoint.openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             doOutput = true
             setRequestProperty("Content-Type", "application/json")
             setRequestProperty("Accept", "text/event-stream")
             if (token.isNotBlank()) {
-                setRequestProperty("Authorization", "Bearer ")
+                setRequestProperty("Authorization", "Bearer $token")
             }
             connectTimeout = 30_000
             readTimeout = 120_000
@@ -43,9 +43,9 @@ class OpenAiTransport(
 
         val code = conn.responseCode
         if (code !in 200..299) {
-            val err = conn.errorStream?.bufferedReader()?.use(BufferedReader::readText) ?: "HTTP "
+            val err = conn.errorStream?.bufferedReader()?.use(BufferedReader::readText) ?: "HTTP $code"
             conn.disconnect()
-            error("Error de conexion con OpenAI/Endpoint (): ")
+            error("Error de conexion con OpenAI/Endpoint ($code): $err")
         }
 
         val toolCallsMap = mutableMapOf<Int, MutableToolCall>()

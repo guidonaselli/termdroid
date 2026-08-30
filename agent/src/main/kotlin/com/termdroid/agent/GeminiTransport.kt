@@ -24,9 +24,9 @@ class GeminiTransport(
         messages: List<Msg>,
     ): Flow<StreamEvent> = flow {
         val urlString = if (token.startsWith("AIzaSy")) {
-            "/v1beta/models/=sse&key="
+            "${baseUrl.removeSuffix("/")}/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${token}"
         } else {
-            "/v1beta/models/=sse"
+            "${baseUrl.removeSuffix("/")}/v1beta/models/${model}:streamGenerateContent?alt=sse"
         }
 
         val conn = (URL(urlString).openConnection() as HttpURLConnection).apply {
@@ -35,7 +35,7 @@ class GeminiTransport(
             setRequestProperty("Content-Type", "application/json")
             setRequestProperty("Accept", "text/event-stream")
             if (!token.startsWith("AIzaSy") && token.isNotBlank()) {
-                setRequestProperty("Authorization", "Bearer ")
+                setRequestProperty("Authorization", "Bearer $token")
             }
             connectTimeout = 30_000
             readTimeout = 120_000
@@ -48,9 +48,9 @@ class GeminiTransport(
 
         val code = conn.responseCode
         if (code !in 200..299) {
-            val err = conn.errorStream?.bufferedReader()?.use(BufferedReader::readText) ?: "HTTP "
+            val err = conn.errorStream?.bufferedReader()?.use(BufferedReader::readText) ?: "HTTP $code"
             conn.disconnect()
-            error("Error de conexion con Gemini (): ")
+            error("Error de conexion con Gemini ($code): $err")
         }
 
         val textBuilder = StringBuilder()
@@ -102,7 +102,7 @@ class GeminiTransport(
                         val fn = part.getJSONObject("functionCall")
                         val fnName = fn.optString("name", "")
                         val fnArgs = fn.optJSONObject("args") ?: JSONObject()
-                        val callId = "call_gemini_" + System.currentTimeMillis() + "_"
+                        val callId = "call_gemini_" + System.currentTimeMillis() + "_" + i
                         toolUses += Block.ToolUse(id = callId, name = fnName, input = fnArgs)
                         stopReason = StopReason.TOOL_USE
                     }

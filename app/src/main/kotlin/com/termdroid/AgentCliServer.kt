@@ -70,7 +70,10 @@ object AgentCliServer {
 
                 val parts = line.removePrefix("RUN ").split(" ", limit = 2)
                 val providerName = parts.getOrNull(0) ?: "CLAUDE"
-                val prompt = parts.getOrNull(1) ?: ""
+                val rawPrompt = parts.getOrNull(1) ?: ""
+                val prompt = runCatching {
+                    String(Base64.decode(rawPrompt, Base64.DEFAULT))
+                }.getOrDefault(rawPrompt)
 
                 if (prompt.isBlank()) {
                     writer.println("E:El prompt no puede estar vacio.")

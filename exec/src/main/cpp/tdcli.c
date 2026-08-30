@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <unistd.h>
 #include <ctype.h>
@@ -11,6 +12,26 @@
 #define BUFFER_SIZE 8192
 
 static const char b64_table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+static char *b64_encode(const char *in, int in_len) {
+    int out_len = 4 * ((in_len + 2) / 3);
+    char *out = (char *)malloc(out_len + 1);
+    if (!out) return NULL;
+    int i = 0, j = 0;
+    while (i < in_len) {
+        uint32_t a = (unsigned char)in[i++];
+        uint32_t b = i < in_len ? (unsigned char)in[i++] : 0;
+        uint32_t c = i < in_len ? (unsigned char)in[i++] : 0;
+        uint32_t triple = (a << 16) + (b << 8) + c;
+
+        out[j++] = b64_table[(triple >> 18) & 0x3F];
+        out[j++] = b64_table[(triple >> 12) & 0x3F];
+        out[j++] = (i > in_len + 1) ? '=' : b64_table[(triple >> 6) & 0x3F];
+        out[j++] = (i > in_len) ? '=' : b64_table[triple & 0x3F];
+    }
+    out[j] = '\0';
+    return out;
+}
 
 static void b64_decode_print(const char *in) {
     int val = 0, valb = -8;
@@ -57,12 +78,19 @@ static int execute_query(const char *provider, const char *prompt) {
         return 1;
     }
 
-    // Enviar consulta: RUN <PROVIDER> <PROMPT>\n
-    char header[512];
+    char *b64_prompt = b64_encode(prompt, strlen(prompt));
+    if (!b64_prompt) {
+        close(sock);
+        return 1;
+    }
+
+    // Formato: RUN <PROVIDER> <B64_PROMPT>\n
+    char header[256];
     snprintf(header, sizeof(header), "RUN %s ", provider);
     send(sock, header, strlen(header), 0);
-    send(sock, prompt, strlen(prompt), 0);
+    send(sock, b64_prompt, strlen(b64_prompt), 0);
     send(sock, "\n", 1, 0);
+    free(b64_prompt);
 
     char buffer[BUFFER_SIZE];
     char line_buf[BUFFER_SIZE];
