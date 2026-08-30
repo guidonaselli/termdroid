@@ -29,8 +29,8 @@ jobs:
       - name: Run Unit Tests
         run: ./gradlew testDebugUnitTest
 
-      - name: Build APKs
-        run: ./gradlew assembleDebug
+      - name: Build APKs and App Bundle
+        run: ./gradlew assembleDebug bundleDebug
 
       - name: Prepare Assets & Checksums
         run: |
@@ -38,8 +38,9 @@ jobs:
           cp app/build/outputs/apk/debug/app-arm64-v8a-debug.apk release-assets/termdroid-arm64-v8a.apk
           cp app/build/outputs/apk/debug/app-x86_64-debug.apk release-assets/termdroid-x86_64.apk
           cp app/build/outputs/apk/debug/app-universal-debug.apk release-assets/termdroid-universal.apk
+          cp app/build/outputs/bundle/debug/app-debug.aab release-assets/termdroid.aab
           cd release-assets
-          sha256sum *.apk > checksums.txt
+          sha256sum *.apk *.aab > checksums.txt
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -48,5 +49,6 @@ jobs:
             release-assets/termdroid-arm64-v8a.apk
             release-assets/termdroid-x86_64.apk
             release-assets/termdroid-universal.apk
+            release-assets/termdroid.aab
             release-assets/checksums.txt
           generate_release_notes: true

@@ -1,0 +1,8 @@
+Termdroid es un emulador de terminal moderno y entorno de ejecucion de agente de IA autonomo desarrollado nativamente para Android.
+
+Funcionalidades principales:
+- Terminal PTY nativo con soporte VT100 / ANSI 256 colores y barra virtual con modificadores (CTRL, ESC, TAB).
+- Agente de IA autonomo integrado con ejecucion de tools en vivo, control de tokens y aprobaciones humanas.
+- Soporte para Node.js, Claude Code CLI, Ripgrep y herramientas Unix.
+- Cliente ADB Loopback embebido para automatizacion avanzada del dispositivo.
+- 100% privado: Cero recoleccion de datos, cifrado local en Android Keystore y almacenamiento aislado.

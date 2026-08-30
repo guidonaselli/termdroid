@@ -1,0 +1,8 @@
+Termdroid is a powerful, modern, open-source terminal emulator and autonomous AI agent runtime designed natively for Android.
+
+Key Features:
+- Native PTY Terminal with VT100 / ANSI 256-color support and virtual modifier toolbar (CTRL, ESC, TAB).
+- Integrated Autonomous AI Agent with live tool execution, cost tracking, and human-in-the-loop approval.
+- Support for Node.js, Claude Code CLI, Ripgrep, and Unix toolchain.
+- Embedded ADB Loopback client for advanced device automation.
+- 100% private: Zero tracking, local keystore encryption, and clean sandboxed storage.

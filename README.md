@@ -94,6 +94,12 @@ adb install -r app/build/outputs/apk/debug/app-universal-debug.apk
 
 ---
 
+## 🔒 Privacy & Security
+
+Termdroid is 100% local-first and collects zero user telemetry. Read the full [Privacy Policy](PRIVACY_POLICY.md).
+
+---
+
 ## 📄 License
 
 Termdroid is open source software licensed under the [Apache License, Version 2.0](LICENSE).
