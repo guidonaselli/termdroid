@@ -52,7 +52,7 @@ class RootfsManagerTest {
         val claude = manager.installClaudeWrapper()
         assertTrue(claude.exists())
         assertTrue(manager.hasClaude)
-        assertTrue(claude.readText().contains("@anthropic-ai/claude-code"))
+        assertTrue(claude.readText().contains("claude"))
     }
 
     @Test

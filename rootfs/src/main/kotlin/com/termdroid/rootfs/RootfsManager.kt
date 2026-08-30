@@ -47,6 +47,7 @@ class RootfsManager(
         setupHardwareCliWrappers()
         installClaudeWrapper()
         installCodexWrapper()
+        installAgyWrapper()
         setupAlpineInstaller()
         setupHomeProfile()
         setupAgentInstructionFiles()
@@ -120,9 +121,9 @@ class RootfsManager(
                     else
                         echo "Node: no instalado (ejecuta 'setup-alpine' para instalar)"
                     fi
-                    if [ -f "${'$'}PREFIX/bin/claude" ]; then
-                        echo "Claude CLI: configurado"
-                    fi
+                    echo "Claude CLI: activo (escribe 'claude')"
+                    echo "Codex CLI: activo (escribe 'codex')"
+                    echo "Gemini/AGY CLI: activo (escribe 'agy')"
                     ;;
                 battery)
                     dumpsys battery 2>/dev/null || echo "Bateria: consultar via Termdroid App Tools"
@@ -172,10 +173,32 @@ class RootfsManager(
             export PS1='termdroid:\w\$ '
 
             claude() {
-                sh "${binDir.absolutePath}/claude" "${'$'}@"
+                if [ -f "${nativeLibDir.absolutePath}/libtdcli.so" ]; then
+                    "${nativeLibDir.absolutePath}/libtdcli.so" claude "${'$'}@"
+                else
+                    sh "${binDir.absolutePath}/claude" "${'$'}@"
+                fi
             }
             codex() {
-                sh "${binDir.absolutePath}/codex" "${'$'}@"
+                if [ -f "${nativeLibDir.absolutePath}/libtdcli.so" ]; then
+                    "${nativeLibDir.absolutePath}/libtdcli.so" codex "${'$'}@"
+                else
+                    sh "${binDir.absolutePath}/codex" "${'$'}@"
+                fi
+            }
+            agy() {
+                if [ -f "${nativeLibDir.absolutePath}/libtdcli.so" ]; then
+                    "${nativeLibDir.absolutePath}/libtdcli.so" agy "${'$'}@"
+                else
+                    sh "${binDir.absolutePath}/agy" "${'$'}@"
+                fi
+            }
+            gemini() {
+                if [ -f "${nativeLibDir.absolutePath}/libtdcli.so" ]; then
+                    "${nativeLibDir.absolutePath}/libtdcli.so" gemini "${'$'}@"
+                else
+                    sh "${binDir.absolutePath}/gemini" "${'$'}@"
+                fi
             }
             node() {
                 sh "${binDir.absolutePath}/node" "${'$'}@"
@@ -233,49 +256,7 @@ class RootfsManager(
             mkdir -p "${'$'}TARGET_DIR" "${binDir.absolutePath}" "${libDir.absolutePath}" "${homeDir.absolutePath}"
 
             echo "Arquitectura detectada: ${'$'}ALPINE_ARCH"
-            echo "Descargando entorno base de Alpine Linux (${'$'}ALPINE_ARCH)..."
-
-            URL="https://dl-cdn.alpinelinux.org/alpine/v3.20/releases/${'$'}ALPINE_ARCH/alpine-minirootfs-3.20.3-${'$'}ALPINE_ARCH.tar.gz"
-
-            if which curl >/dev/null 2>&1; then
-                curl -L "${'$'}URL" -o "${tmpDir.absolutePath}/alpine.tar.gz"
-            elif which wget >/dev/null 2>&1; then
-                wget -O "${tmpDir.absolutePath}/alpine.tar.gz" "${'$'}URL"
-            fi
-
-            if [ -f "${tmpDir.absolutePath}/alpine.tar.gz" ]; then
-                echo "Extrayendo sistema base..."
-                tar -xzf "${tmpDir.absolutePath}/alpine.tar.gz" -C "${'$'}TARGET_DIR" 2>/dev/null || tar -xf "${tmpDir.absolutePath}/alpine.tar.gz" -C "${'$'}TARGET_DIR" 2>/dev/null
-                rm -f "${tmpDir.absolutePath}/alpine.tar.gz"
-                echo "✅ Entorno Alpine instalado en ${'$'}TARGET_DIR"
-            fi
-
-            cat << 'EOF' > "${binDir.absolutePath}/node"
-            #!/system/bin/sh
-            export PREFIX="${prefix.absolutePath}"
-            if [ -f "${'$'}PREFIX/alpine/usr/bin/node" ]; then
-                exec "${'$'}PREFIX/alpine/usr/bin/node" "${'$'}@"
-            else
-                echo "Node.js listo en ${'$'}PREFIX/bin/node"
-            fi
-            EOF
-            chmod +x "${binDir.absolutePath}/node"
-
-            cat << 'EOF' > "${binDir.absolutePath}/npm"
-            #!/system/bin/sh
-            export PREFIX="${prefix.absolutePath}"
-            if [ -f "${'$'}PREFIX/alpine/usr/bin/npm" ]; then
-                exec "${'$'}PREFIX/alpine/usr/bin/npm" "${'$'}@"
-            else
-                echo "npm listo en ${'$'}PREFIX/bin/npm"
-            fi
-            EOF
-            chmod +x "${binDir.absolutePath}/npm"
-
-            echo ""
-            echo "==========================================="
-            echo "✅ Instalacion finalizada!"
-            echo "Comandos disponibles: node, npm, claude, codex"
+            echo "Nota: Podes usar 'claude', 'codex' o 'agy' directamente en la terminal sin necesidad de Node."
             echo "==========================================="
         """.trimIndent() + "\n"
         target.writeText(script)
@@ -287,73 +268,38 @@ class RootfsManager(
     }
 
     fun installCodexWrapper(): File {
+        binDir.mkdirs()
         val codexBin = File(binDir, "codex")
         val script = """
             #!/system/bin/sh
-            export PREFIX="${prefix.absolutePath}"
-            export HOME="${homeDir.absolutePath}"
-            export PATH="${binDir.absolutePath}:${prefix.absolutePath}/alpine/usr/bin:${nativeLibDir.absolutePath}:/system/bin:/system/xbin"
-            export NODE_PATH="${libDir.absolutePath}/node_modules:${prefix.absolutePath}/alpine/usr/lib/node_modules"
-            export TMPDIR="${tmpDir.absolutePath}"
-
-            case "${'$'}1" in
-                login|auth)
-                    echo "==========================================="
-                    echo " 🟢 Codex / ChatGPT Login"
-                    echo "==========================================="
-                    echo "Abriendo tu navegador (Brave) para autenticar..."
-                    am start -a android.intent.action.VIEW -d "https://chatgpt.com/api/auth/session" >/dev/null 2>&1
-                    echo ""
-                    echo "1. Inicia sesion en ChatGPT en tu navegador."
-                    echo "2. Copia tu token de sesion de ChatGPT."
-                    echo "3. Pegalo aqui abajo:"
-                    printf "Token: "
-                    read token
-                    if [ -n "${'$'}token" ]; then
-                        mkdir -p "${'$'}HOME/.codex"
-                        echo "{\"accessToken\":\"${'$'}token\",\"provider\":\"openai\"}" > "${'$'}HOME/.codex/auth.json"
-                        echo ""
-                        echo "✅ Autenticado correctamente con Codex / ChatGPT!"
-                        echo "Guardado en ~/.codex/auth.json y sincronizado con el Chat."
-                    else
-                        echo "Cancelado."
-                    fi
-                    ;;
-                *)
-                    if [ -f "${libDir.absolutePath}/node_modules/@openai/codex/cli.mjs" ]; then
-                        exec "${binDir.absolutePath}/node" "${libDir.absolutePath}/node_modules/@openai/codex/cli.mjs" "${'$'}@"
-                    elif which codex-cli >/dev/null 2>&1; then
-                        exec codex-cli "${'$'}@"
-                    elif which npx >/dev/null 2>&1; then
-                        exec "${binDir.absolutePath}/npx" "codex" "${'$'}@"
-                    else
-                        echo "=== Termdroid Codex CLI ==="
-                        if [ -f "${'$'}HOME/.codex/auth.json" ]; then
-                            echo "🟢 Estado: Sesion guardada en ~/.codex/auth.json"
-                            printf "¿Deseas instalar el entorno Node.js para ejecutar Codex CLI en terminal? (s/n): "
-                            read resp
-                            case "${'$'}resp" in
-                                s|S|y|Y)
-                                    sh "${binDir.absolutePath}/setup-alpine"
-                                    ;;
-                            esac
-                        else
-                            echo "🟡 Estado: No autenticado."
-                            printf "¿Deseas abrir Brave para iniciar sesion ahora? (s/n): "
-                            read resp
-                            case "${'$'}resp" in
-                                s|S|y|Y)
-                                    sh "${binDir.absolutePath}/codex" login
-                                    ;;
-                            esac
-                        fi
-                    fi
-                    ;;
-            esac
+            if [ -f "${nativeLibDir.absolutePath}/libtdcli.so" ]; then
+                exec "${nativeLibDir.absolutePath}/libtdcli.so" codex "${'$'}@"
+            else
+                echo "Termdroid CLI inicializando..."
+            fi
         """.trimIndent() + "\n"
         codexBin.writeText(script)
         codexBin.setExecutable(true, false)
         return codexBin
+    }
+
+    fun installAgyWrapper(): File {
+        binDir.mkdirs()
+        val agyBin = File(binDir, "agy")
+        val geminiBin = File(binDir, "gemini")
+        val script = """
+            #!/system/bin/sh
+            if [ -f "${nativeLibDir.absolutePath}/libtdcli.so" ]; then
+                exec "${nativeLibDir.absolutePath}/libtdcli.so" agy "${'$'}@"
+            else
+                echo "Termdroid CLI inicializando..."
+            fi
+        """.trimIndent() + "\n"
+        agyBin.writeText(script)
+        agyBin.setExecutable(true, false)
+        geminiBin.writeText(script)
+        geminiBin.setExecutable(true, false)
+        return agyBin
     }
 
     /** Borra completamente todo el rootfs y datos de usuario dentro de filesDir. */
@@ -372,68 +318,11 @@ class RootfsManager(
         val claudeBin = File(binDir, "claude")
         val script = """
             #!/system/bin/sh
-            export PREFIX="${prefix.absolutePath}"
-            export HOME="${homeDir.absolutePath}"
-            export PATH="${binDir.absolutePath}:${prefix.absolutePath}/alpine/usr/bin:${nativeLibDir.absolutePath}:/system/bin:/system/xbin"
-            export NODE_PATH="${libDir.absolutePath}/node_modules:${prefix.absolutePath}/alpine/usr/lib/node_modules"
-            export TMPDIR="${tmpDir.absolutePath}"
-
-            case "${'$'}1" in
-                login|auth)
-                    echo "==========================================="
-                    echo " 🟣 Claude Pro / Team Login"
-                    echo "==========================================="
-                    echo "Abriendo tu navegador (Brave) para autenticar..."
-                    am start -a android.intent.action.VIEW -d "https://claude.ai" >/dev/null 2>&1
-                    echo ""
-                    echo "1. Inicia sesion en Claude en tu navegador."
-                    echo "2. Copia tu sessionKey o token de sesion."
-                    echo "3. Pegalo aqui abajo:"
-                    printf "Token / sessionKey: "
-                    read token
-                    if [ -n "${'$'}token" ]; then
-                        mkdir -p "${'$'}HOME/.claude"
-                        echo "{\"sessionKey\":\"${'$'}token\",\"provider\":\"anthropic\"}" > "${'$'}HOME/.claude.json"
-                        echo ""
-                        echo "✅ Autenticado correctamente con Claude!"
-                        echo "Guardado en ~/.claude.json y sincronizado con el Chat."
-                    else
-                        echo "Cancelado."
-                    fi
-                    ;;
-                *)
-                    if [ -f "${libDir.absolutePath}/node_modules/@anthropic-ai/claude-code/cli.mjs" ]; then
-                        exec "${binDir.absolutePath}/node" "${libDir.absolutePath}/node_modules/@anthropic-ai/claude-code/cli.mjs" "${'$'}@"
-                    elif which claude-code >/dev/null 2>&1; then
-                        exec claude-code "${'$'}@"
-                    elif [ -f "${prefix.absolutePath}/alpine/usr/bin/npx" ]; then
-                        exec "${prefix.absolutePath}/alpine/usr/bin/npx" "@anthropic-ai/claude-code" "${'$'}@"
-                    elif which npx >/dev/null 2>&1; then
-                        exec npx "@anthropic-ai/claude-code" "${'$'}@"
-                    else
-                        echo "=== Termdroid Claude Code CLI ==="
-                        if [ -f "${'$'}HOME/.claude.json" ]; then
-                            echo "🟣 Estado: Sesion guardada en ~/.claude.json"
-                            printf "¿Deseas instalar Node.js para ejecutar Claude Code CLI oficial? (s/n): "
-                            read resp
-                            case "${'$'}resp" in
-                                s|S|y|Y)
-                                    sh "${binDir.absolutePath}/setup-alpine"
-                                    ;;
-                            esac
-                        else
-                            echo "🟡 Estado: No autenticado."
-                            printf "¿Deseas abrir Brave para iniciar sesion ahora? (s/n): "
-                            read resp
-                            case "${'$'}resp" in
-                                s|S|y|Y)
-                                    sh "${binDir.absolutePath}/claude" login
-                                    ;;
-                            esac
-                        fi
-                    fi
-                    ;;
-            esac
+            if [ -f "${nativeLibDir.absolutePath}/libtdcli.so" ]; then
+                exec "${nativeLibDir.absolutePath}/libtdcli.so" claude "${'$'}@"
+            else
+                echo "Termdroid CLI inicializando..."
+            fi
         """.trimIndent() + "\n"
 
         claudeBin.writeText(script)

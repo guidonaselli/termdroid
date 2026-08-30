@@ -18,3 +18,12 @@ set_target_properties(tdprobe PROPERTIES
     PREFIX "lib"
     SUFFIX ".so")
 target_link_options(tdprobe PRIVATE -pie)
+
+# CLI nativo para la terminal (claude, codex, gemini, agy)
+add_executable(tdcli tdcli.c)
+set_target_properties(tdcli PROPERTIES
+    OUTPUT_NAME "tdcli"
+    PREFIX "lib"
+    SUFFIX ".so")
+target_link_options(tdcli PRIVATE -pie)
+target_link_libraries(tdcli log)

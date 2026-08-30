@@ -178,9 +178,11 @@ private fun TerminalPane(session: ShellSession, modifier: Modifier = Modifier) {
 @Composable
 private fun QuickCommandsRow(onCommand: (String) -> Unit) {
     val quicks = listOf(
-        "codex login",
+        "claude",
+        "codex",
+        "agy",
         "claude login",
-        "setup-alpine",
+        "codex login",
         "termdroid info",
         "termdroid battery",
         "ls -la",
