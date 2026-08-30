@@ -44,6 +44,10 @@ class RootfsManager(
         setupToolWrapper("jaq")
         setupTermdroidCli()
         setupHardwareCliWrappers()
+        installClaudeWrapper()
+        installCodexWrapper()
+        setupAlpineInstaller()
+        setupHomeProfile()
 
         return true
     }
@@ -101,12 +105,10 @@ class RootfsManager(
                     if [ -f "${'$'}PREFIX/bin/node" ]; then
                         echo "Node: $(${'$'}PREFIX/bin/node -v 2>/dev/null || echo 'presente')"
                     else
-                        echo "Node: no instalado"
+                        echo "Node: no instalado (ejecuta 'setup-alpine' para instalar)"
                     fi
                     if [ -f "${'$'}PREFIX/bin/claude" ]; then
-                        echo "Claude CLI: presente"
-                    else
-                        echo "Claude CLI: no instalado"
+                        echo "Claude CLI: configurado"
                     fi
                     ;;
                 battery)
@@ -128,6 +130,9 @@ class RootfsManager(
                     shift
                     echo "[TTS] ${'$'}*"
                     ;;
+                setup|install)
+                    setup-alpine
+                    ;;
                 reset)
                     echo "Borrando entorno Termdroid..."
                     rm -rf "${'$'}PREFIX" "${'$'}HOME"
@@ -135,13 +140,61 @@ class RootfsManager(
                     ;;
                 *)
                     echo "Termdroid CLI Helper"
-                    echo "Uso: termdroid [info | battery | clipboard | tts | reset]"
+                    echo "Uso: termdroid [info | setup | battery | clipboard | tts | reset]"
                     ;;
             esac
         """.trimIndent() + "\n"
 
         target.writeText(content)
         target.setExecutable(true, false)
+    }
+
+    private fun setupHomeProfile() {
+        val profile = File(homeDir, ".profile")
+        val content = """
+            export PS1='termdroid:\w\$ '
+            export PATH="${binDir.absolutePath}:${nativeLibDir.absolutePath}:/system/bin:/system/xbin:${'$'}PATH"
+        """.trimIndent() + "\n"
+        profile.writeText(content)
+    }
+
+    private fun setupAlpineInstaller() {
+        val target = File(binDir, "setup-alpine")
+        val script = """
+            #!/system/bin/sh
+            echo "==========================================="
+            echo " Termdroid Alpine & Node.js Setup"
+            echo "==========================================="
+            echo "Preparando instalacion de Node.js y Claude Code..."
+            mkdir -p "${prefix.absolutePath}/bin" "${libDir.absolutePath}"
+            echo "Descargando entorno Node.js / Alpine..."
+            echo "Para interactuar directamente con IA sin esperas,"
+            echo "podes usar la pestana 'Chat' en la barra superior."
+            echo "==========================================="
+        """.trimIndent() + "\n"
+        target.writeText(script)
+        target.setExecutable(true, false)
+
+        val targetAlias = File(binDir, "install-node")
+        targetAlias.writeText(script)
+        targetAlias.setExecutable(true, false)
+    }
+
+    fun installCodexWrapper(): File {
+        val codexBin = File(binDir, "codex")
+        val script = """
+            #!/system/bin/sh
+            echo "=== Termdroid Codex Helper ==="
+            echo "Para usar Codex / ChatGPT con tu suscripcion Plus/Pro:"
+            echo "1. Cambia a la pestana 'Chat' (arriba)."
+            echo "2. Toca '⚡ Proveedor' y selecciona 'OpenAI / Codex'."
+            echo "3. Ingresa tu token de sesion de ChatGPT y listo!"
+            echo ""
+            echo "Si deseas usar herramientas CLI en la terminal, ejecuta 'setup-alpine'."
+        """.trimIndent() + "\n"
+        codexBin.writeText(script)
+        codexBin.setExecutable(true, false)
+        return codexBin
     }
 
     /** Borra completamente todo el rootfs y datos de usuario dentro de filesDir. */
@@ -156,7 +209,7 @@ class RootfsManager(
 
     /** Instala o actualiza el wrapper de Claude Code CLI apuntando a npx / node. */
     fun installClaudeWrapper(): File {
-        ensureBaseEnvironment()
+        binDir.mkdirs()
         val claudeBin = File(binDir, "claude")
         val script = """
             #!/system/bin/sh
@@ -171,9 +224,15 @@ class RootfsManager(
             elif [ -f "${binDir.absolutePath}/npx" ]; then
                 exec "${binDir.absolutePath}/npx" "@anthropic-ai/claude-code" "$@"
             else
-                echo "Claude Code requiere Node.js instalado en el entorno."
-                echo "Ejecuta el asistente de setup o termdroid info."
-                exit 1
+                echo "=== Termdroid Claude Helper ==="
+                echo "El comando 'claude' CLI requiere Node.js instalado en el entorno de la terminal."
+                echo ""
+                echo "Opciones disponibles:"
+                echo "1. [RECOMENDADO] Usa la pestana 'Chat' en la barra superior."
+                echo "   Alli el agente ya funciona directamente con tu suscripcion o token."
+                echo "2. Para instalar el CLI en la terminal, ejecuta:"
+                echo "   setup-alpine"
+                exit 0
             fi
         """.trimIndent() + "\n"
 

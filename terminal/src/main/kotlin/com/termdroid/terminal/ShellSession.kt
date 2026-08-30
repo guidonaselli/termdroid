@@ -53,6 +53,7 @@ class ShellSession(
         }
 
         val homeDir = File(context.filesDir, "home").apply { mkdirs() }
+        val profileFile = File(homeDir, ".profile")
         val session = PtySession.start(
             argv = argv,
             env = mapOf(
@@ -61,6 +62,7 @@ class ShellSession(
                 "TERM" to "xterm-256color",
                 "TMPDIR" to context.cacheDir.absolutePath,
                 "PREFIX" to env.prefix.absolutePath,
+                "ENV" to profileFile.absolutePath,
                 "LD_LIBRARY_PATH" to "${env.prefix}/lib:${env.nativeLibDir.absolutePath}",
                 "NODE_PATH" to "${env.prefix}/lib/node_modules",
             ),
