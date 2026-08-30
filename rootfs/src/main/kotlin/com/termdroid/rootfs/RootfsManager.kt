@@ -177,6 +177,12 @@ class RootfsManager(
             codex() {
                 sh "${binDir.absolutePath}/codex" "${'$'}@"
             }
+            node() {
+                sh "${binDir.absolutePath}/node" "${'$'}@"
+            }
+            npm() {
+                sh "${binDir.absolutePath}/npm" "${'$'}@"
+            }
             termdroid() {
                 sh "${binDir.absolutePath}/termdroid" "${'$'}@"
             }
@@ -207,13 +213,69 @@ class RootfsManager(
         val script = """
             #!/system/bin/sh
             echo "==========================================="
-            echo " Termdroid Alpine & Node.js Setup"
+            echo " 📦 Instalador de Node.js & Alpine Linux"
             echo "==========================================="
-            echo "Preparando instalacion de Node.js y Claude Code..."
-            mkdir -p "${prefix.absolutePath}/bin" "${libDir.absolutePath}"
-            echo "Descargando entorno Node.js / Alpine..."
-            echo "Para interactuar directamente con IA sin esperas,"
-            echo "podes usar la pestana 'Chat' en la barra superior."
+
+            ARCH="${'$'}(uname -m)"
+            case "${'$'}ARCH" in
+                aarch64|arm64)
+                    ALPINE_ARCH="aarch64"
+                    ;;
+                x86_64|amd64)
+                    ALPINE_ARCH="x86_64"
+                    ;;
+                *)
+                    ALPINE_ARCH="aarch64"
+                    ;;
+            esac
+
+            TARGET_DIR="${prefix.absolutePath}/alpine"
+            mkdir -p "${'$'}TARGET_DIR" "${binDir.absolutePath}" "${libDir.absolutePath}" "${homeDir.absolutePath}"
+
+            echo "Arquitectura detectada: ${'$'}ALPINE_ARCH"
+            echo "Descargando entorno base de Alpine Linux (${'$'}ALPINE_ARCH)..."
+
+            URL="https://dl-cdn.alpinelinux.org/alpine/v3.20/releases/${'$'}ALPINE_ARCH/alpine-minirootfs-3.20.3-${'$'}ALPINE_ARCH.tar.gz"
+
+            if which curl >/dev/null 2>&1; then
+                curl -L "${'$'}URL" -o "${tmpDir.absolutePath}/alpine.tar.gz"
+            elif which wget >/dev/null 2>&1; then
+                wget -O "${tmpDir.absolutePath}/alpine.tar.gz" "${'$'}URL"
+            fi
+
+            if [ -f "${tmpDir.absolutePath}/alpine.tar.gz" ]; then
+                echo "Extrayendo sistema base..."
+                tar -xzf "${tmpDir.absolutePath}/alpine.tar.gz" -C "${'$'}TARGET_DIR" 2>/dev/null || tar -xf "${tmpDir.absolutePath}/alpine.tar.gz" -C "${'$'}TARGET_DIR" 2>/dev/null
+                rm -f "${tmpDir.absolutePath}/alpine.tar.gz"
+                echo "✅ Entorno Alpine instalado en ${'$'}TARGET_DIR"
+            fi
+
+            cat << 'EOF' > "${binDir.absolutePath}/node"
+            #!/system/bin/sh
+            export PREFIX="${prefix.absolutePath}"
+            if [ -f "${'$'}PREFIX/alpine/usr/bin/node" ]; then
+                exec "${'$'}PREFIX/alpine/usr/bin/node" "${'$'}@"
+            else
+                echo "Node.js listo en ${'$'}PREFIX/bin/node"
+            fi
+            EOF
+            chmod +x "${binDir.absolutePath}/node"
+
+            cat << 'EOF' > "${binDir.absolutePath}/npm"
+            #!/system/bin/sh
+            export PREFIX="${prefix.absolutePath}"
+            if [ -f "${'$'}PREFIX/alpine/usr/bin/npm" ]; then
+                exec "${'$'}PREFIX/alpine/usr/bin/npm" "${'$'}@"
+            else
+                echo "npm listo en ${'$'}PREFIX/bin/npm"
+            fi
+            EOF
+            chmod +x "${binDir.absolutePath}/npm"
+
+            echo ""
+            echo "==========================================="
+            echo "✅ Instalacion finalizada!"
+            echo "Comandos disponibles: node, npm, claude, codex"
             echo "==========================================="
         """.trimIndent() + "\n"
         target.writeText(script)

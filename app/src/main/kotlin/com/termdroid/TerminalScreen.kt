@@ -180,6 +180,7 @@ private fun QuickCommandsRow(onCommand: (String) -> Unit) {
     val quicks = listOf(
         "codex login",
         "claude login",
+        "setup-alpine",
         "termdroid info",
         "termdroid battery",
         "ls -la",
