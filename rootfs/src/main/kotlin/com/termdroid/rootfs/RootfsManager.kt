@@ -119,7 +119,7 @@ class RootfsManager(
                     if [ -f "${'$'}PREFIX/bin/node" ]; then
                         echo "Node: $(${'$'}PREFIX/bin/node -v 2>/dev/null || echo 'presente')"
                     else
-                        echo "Node: no instalado (ejecuta 'setup-alpine' para instalar)"
+                        echo "Node: no instalado (ejecuta 'setup-environment' para instalar)"
                     fi
                     echo "Claude CLI: activo (escribe 'claude')"
                     echo "Codex CLI: activo (escribe 'codex')"
@@ -145,7 +145,7 @@ class RootfsManager(
                     echo "[TTS] ${'$'}*"
                     ;;
                 setup|install)
-                    setup-alpine
+                    setup-environment
                     ;;
                 reset)
                     echo "Borrando entorno Termdroid..."
