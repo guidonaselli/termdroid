@@ -260,8 +260,41 @@ class RootfsManager(
         val target = File(binDir, "setup-environment")
         val script = """
             #!/system/bin/sh
-            if [ -f "${nativeLibDir.absolutePath}/libtdcli.so" ]; then
-                exec "${nativeLibDir.absolutePath}/libtdcli.so" install
+            export PREFIX="${prefix.absolutePath}"
+            export HOME="${homeDir.absolutePath}"
+            export PATH="${prefix.absolutePath}/bin:${binDir.absolutePath}:${nativeLibDir.absolutePath}:/system/bin:/system/xbin"
+            export LD_LIBRARY_PATH="${prefix.absolutePath}/lib:${nativeLibDir.absolutePath}"
+            export TMPDIR="${prefix.absolutePath}/tmp"
+            export LD_PRELOAD="${prefix.absolutePath}/lib/libtermux-exec.so"
+
+            echo "==========================================="
+            echo " 📦 Instalador de Node.js y CLIs Oficiales"
+            echo "==========================================="
+
+            if [ ! -f "${prefix.absolutePath}/bin/apt-get" ]; then
+                echo "Descargando entorno base..."
+                if [ -f "${nativeLibDir.absolutePath}/libtdcli.so" ]; then
+                    "${nativeLibDir.absolutePath}/libtdcli.so" install
+                fi
+            fi
+
+            if [ -f "${prefix.absolutePath}/bin/apt-get" ]; then
+                echo "Actualizando listas de paquetes (apt update)..."
+                apt-get update -y
+                echo "Instalando Node.js oficial y dependencias..."
+                apt-get install -y nodejs git
+            fi
+
+            if [ -f "${prefix.absolutePath}/bin/node" ]; then
+                echo "Node.js instalado: $(${prefix.absolutePath}/bin/node -v)"
+                echo "Instalando CLIs oficiales (@anthropic-ai/claude-code)..."
+                npm install -g @anthropic-ai/claude-code @openai/codex
+                echo "==========================================="
+                echo "✅ ¡Instalacion completada con exito!"
+                echo "Ya podes escribir 'claude' o 'codex'."
+                echo "==========================================="
+            else
+                echo "❌ Error: Node.js no pudo instalarse."
             fi
         """.trimIndent() + "\n"
         target.writeText(script)

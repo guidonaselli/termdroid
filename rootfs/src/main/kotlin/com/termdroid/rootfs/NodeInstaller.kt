@@ -19,9 +19,6 @@ object NodeInstaller {
     private const val BOOTSTRAP_BASE_URL =
         "https://github.com/termux/termux-packages/releases/latest/download"
 
-    private const val NODE_DEB_BASE_URL =
-        "https://packages.termux.dev/apt/termux-main/pool/main/n/nodejs"
-
     fun isNodeInstalled(prefix: File): Boolean {
         val nodeBin = File(prefix, "bin/node")
         val npmBin = File(prefix, "bin/npm")
@@ -41,7 +38,7 @@ object NodeInstaller {
     }
 
     /**
-     * Descarga e instala el bootstrap base y Node.js de forma directa y deterministica.
+     * Descarga e instala el bootstrap base y configura DNS / APT para instalación de paquetes.
      */
     suspend fun installFullEnvironment(
         prefix: File,
@@ -71,73 +68,47 @@ object NodeInstaller {
             applySymlinks(prefix)
             setPermissions(prefix)
 
-            // Descargar e instalar Node.js directamente
-            onProgress("Descargando Node.js oficial...")
-            val nodeDebName = if (arch == "aarch64") "nodejs_26.4.0-1_aarch64.deb" else "nodejs_26.4.0-1_x86_64.deb"
-            val nodeDebUrl = "$NODE_DEB_BASE_URL/$nodeDebName"
-            val targetDeb = File(cacheDir, nodeDebName)
+            onProgress("Configurando DNS y repositorios APT...")
+            configureAptAndDns(prefix)
 
-            runCatching {
-                downloadFile(nodeDebUrl, targetDeb) { pct ->
-                    if (pct % 50 == 0) onProgress("Descargando Node.js: $pct%")
-                }
-
-                onProgress("Desempaquetando Node.js...")
-                val extractDir = File(cacheDir, "node_extracted").apply { mkdirs() }
-                val dpkgBin = File(prefix, "bin/dpkg-deb").takeIf { it.exists() } ?: File(prefix, "bin/dpkg")
-                if (dpkgBin.exists()) {
-                    val p = ProcessBuilder(
-                        dpkgBin.absolutePath,
-                        "-x",
-                        targetDeb.absolutePath,
-                        extractDir.absolutePath
-                    ).apply {
-                        environment()["LD_LIBRARY_PATH"] = File(prefix, "lib").absolutePath
-                    }.start()
-                    p.waitFor()
-
-                    // Mover archivos desde data/data/com.termux/files/usr hacia prefix
-                    val unpackedUsr = File(extractDir, "data/data/com.termux/files/usr")
-                    if (unpackedUsr.exists()) {
-                        unpackedUsr.walkTopDown().forEach { f ->
-                            val rel = f.relativeTo(unpackedUsr).path
-                            if (rel.isNotBlank()) {
-                                val dest = File(prefix, rel)
-                                if (f.isDirectory) {
-                                    dest.mkdirs()
-                                } else {
-                                    dest.parentFile?.mkdirs()
-                                    f.copyTo(dest, overwrite = true)
-                                }
-                            }
-                        }
-                    }
-                }
-                targetDeb.delete()
-                extractDir.deleteRecursively()
-            }
-
-            // Asegurar symlinks de npm y permisos de node
-            val nodeBin = File(prefix, "bin/node")
-            if (nodeBin.exists()) {
-                nodeBin.setExecutable(true, false)
-                val npmCli = File(prefix, "lib/node_modules/npm/bin/npm-cli.js")
-                val npmBin = File(prefix, "bin/npm")
-                if (npmCli.exists() && !npmBin.exists()) {
-                    npmBin.writeText("#!/system/bin/sh\nexec \"${nodeBin.absolutePath}\" \"${npmCli.absolutePath}\" \"$@\"\n")
-                    npmBin.setExecutable(true, false)
-                }
-                val npxCli = File(prefix, "lib/node_modules/npm/bin/npx-cli.js")
-                val npxBin = File(prefix, "bin/npx")
-                if (npxCli.exists() && !npxBin.exists()) {
-                    npxBin.writeText("#!/system/bin/sh\nexec \"${nodeBin.absolutePath}\" \"${npxCli.absolutePath}\" \"$@\"\n")
-                    npxBin.setExecutable(true, false)
-                }
-            }
-
-            setPermissions(prefix)
-            onProgress("Sistema base y Node.js instalados correctamente.")
+            onProgress("Sistema base configurado con exito.")
         }
+    }
+
+    fun configureAptAndDns(prefix: File) {
+        val etc = File(prefix, "etc").apply { mkdirs() }
+        val aptDir = File(etc, "apt").apply { mkdirs() }
+        File(aptDir, "trusted.gpg.d").mkdirs()
+
+        // DNS resolver para Bionic libc
+        val resolv = File(etc, "resolv.conf")
+        resolv.writeText("nameserver 8.8.8.8\nnameserver 1.1.1.1\n")
+
+        // Repositorio de paquetes
+        val sources = File(aptDir, "sources.list")
+        sources.writeText("deb https://packages.termux.dev/apt/termux-main stable main\n")
+
+        // Configuracion de rutas para apt
+        val aptConf = File(aptDir, "apt.conf")
+        aptConf.writeText("""
+            Dir "${prefix.absolutePath}";
+            Dir::State "${prefix.absolutePath}/var/lib/apt";
+            Dir::State::status "${prefix.absolutePath}/var/lib/dpkg/status";
+            Dir::Cache "${prefix.absolutePath}/var/cache/apt";
+            Dir::Etc "${prefix.absolutePath}/etc/apt";
+            Acquire::Languages "none";
+        """.trimIndent() + "\n")
+
+        // Estructura de estado de dpkg y apt
+        val dpkgDir = File(prefix, "var/lib/dpkg").apply { mkdirs() }
+        File(dpkgDir, "info").mkdirs()
+        File(dpkgDir, "updates").mkdirs()
+        val dpkgStatus = File(dpkgDir, "status")
+        if (!dpkgStatus.exists()) dpkgStatus.writeText("")
+
+        File(prefix, "var/lib/apt/lists/partial").mkdirs()
+        File(prefix, "var/cache/apt/archives/partial").mkdirs()
+        File(prefix, "tmp").mkdirs()
     }
 
     private fun detectArch(): String {

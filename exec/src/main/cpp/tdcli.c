@@ -279,19 +279,26 @@ static int run_install(void) {
     }
     close(sock);
 
-    printf("\n⚙️ Instalando CLIs oficiales de Claude y OpenAI...\n");
+    printf("\n⚙️ Actualizando repositorios e instalando Node.js oficial...\n");
     const char *prefix = getenv("PREFIX");
     if (!prefix) prefix = "/data/data/com.termdroid/files/usr";
 
-    char cmd[1024];
-    snprintf(cmd, sizeof(cmd), "export PATH=\"%s/bin:$PATH\" && export LD_LIBRARY_PATH=\"%s/lib:$LD_LIBRARY_PATH\" && export NODE_PATH=\"%s/lib/node_modules\" && npm install -g @anthropic-ai/claude-code @openai/codex", prefix, prefix, prefix);
-    system(cmd);
+    char cmd[2048];
+    snprintf(cmd, sizeof(cmd), "export PREFIX=\"%s\" && export HOME=\"/data/data/com.termdroid/files/home\" && export PATH=\"%s/bin:$PATH\" && export LD_LIBRARY_PATH=\"%s/lib:$LD_LIBRARY_PATH\" && export TMPDIR=\"%s/tmp\" && export LD_PRELOAD=\"%s/lib/libtermux-exec.so\" && apt-get update -y && apt-get install -y nodejs git && npm install -g @anthropic-ai/claude-code @openai/codex", prefix, prefix, prefix, prefix, prefix);
+    int res = system(cmd);
 
-    printf("\n===========================================\n");
-    printf("✅ ¡Instalacion completada!\n");
-    printf("Escribe 'claude' o 'codex' para iniciar sesion.\n");
-    printf("===========================================\n");
-    return 0;
+    if (res == 0) {
+        printf("\n===========================================\n");
+        printf("✅ ¡Instalacion completada con exito!\n");
+        printf("Escribe 'claude' o 'codex' para iniciar sesion.\n");
+        printf("===========================================\n");
+    } else {
+        printf("\n===========================================\n");
+        printf("⚠️ Hubo advertencias o errores durante la instalacion.\n");
+        printf("Podes ejecutar 'apt-get install nodejs' manualmente si es necesario.\n");
+        printf("===========================================\n");
+    }
+    return res;
 }
 
 int main(int argc, char **argv) {
