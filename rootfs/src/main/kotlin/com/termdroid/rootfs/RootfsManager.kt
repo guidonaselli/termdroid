@@ -152,8 +152,33 @@ class RootfsManager(
     private fun setupHomeProfile() {
         val profile = File(homeDir, ".profile")
         val content = """
-            export PS1='termdroid:\w\$ '
+            export PREFIX="${prefix.absolutePath}"
+            export HOME="${homeDir.absolutePath}"
+            export TMPDIR="${cacheDir.absolutePath}"
             export PATH="${binDir.absolutePath}:${nativeLibDir.absolutePath}:/system/bin:/system/xbin:${'$'}PATH"
+            export PS1='termdroid:\w\$ '
+
+            claude() {
+                sh "${binDir.absolutePath}/claude" "${'$'}@"
+            }
+            codex() {
+                sh "${binDir.absolutePath}/codex" "${'$'}@"
+            }
+            termdroid() {
+                sh "${binDir.absolutePath}/termdroid" "${'$'}@"
+            }
+            setup-alpine() {
+                sh "${binDir.absolutePath}/setup-alpine" "${'$'}@"
+            }
+            install-node() {
+                sh "${binDir.absolutePath}/setup-alpine" "${'$'}@"
+            }
+            rg() {
+                "${nativeLibDir.absolutePath}/librg.so" "${'$'}@"
+            }
+            jaq() {
+                "${nativeLibDir.absolutePath}/libjaq.so" "${'$'}@"
+            }
         """.trimIndent() + "\n"
         profile.writeText(content)
     }

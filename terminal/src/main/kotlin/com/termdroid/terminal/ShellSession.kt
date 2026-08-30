@@ -85,6 +85,14 @@ class ShellSession(
             }
             _alive.value = false
         }
+
+        if (shell.absolutePath == SYSTEM_SH) {
+            scope.launch(Dispatchers.IO) {
+                kotlinx.coroutines.delay(60)
+                pty?.write(". \"${profileFile.absolutePath}\" 2>/dev/null; clear\n")
+            }
+        }
+
         _screen.value = synchronized(lock) { snapshot() }
     }
 
