@@ -246,23 +246,32 @@ class RootfsManager(
                         echo "{\"accessToken\":\"${'$'}token\",\"provider\":\"openai\"}" > "${'$'}HOME/.codex/auth.json"
                         echo ""
                         echo "✅ Autenticado correctamente con Codex / ChatGPT!"
-                        echo "Guardado en ~/.codex/auth.json"
+                        echo "Guardado en ~/.codex/auth.json y sincronizado con el Chat."
                     else
                         echo "Cancelado."
                     fi
                     ;;
                 *)
                     echo "=== Termdroid Codex Helper ==="
-                    echo "Comandos:"
-                    echo "  codex login   -> Iniciar sesion abriendo Brave/navegador"
-                    echo ""
                     if [ -f "${'$'}HOME/.codex/auth.json" ]; then
-                        echo "Estado: Sesion guardada en ~/.codex/auth.json"
+                        echo "🟢 Estado: Sesion activa en ~/.codex/auth.json"
+                        echo "Comandos disponibles:"
+                        echo "  codex login   -> Re-autenticar o cambiar cuenta"
+                        echo ""
+                        echo "Tip: El agente ya esta conectado en la pestana 'Chat'."
                     else
-                        echo "Estado: No autenticado. Ejecuta 'codex login'."
+                        echo "🟡 Estado: No autenticado."
+                        printf "¿Deseas abrir Brave para iniciar sesion ahora? (s/n): "
+                        read resp
+                        case "${'$'}resp" in
+                            s|S|y|Y)
+                                sh "${binDir.absolutePath}/codex" login
+                                ;;
+                            *)
+                                echo "Podes iniciar sesion en cualquier momento con 'codex login'."
+                                ;;
+                        esac
                     fi
-                    echo ""
-                    echo "Tip: Tambien podes chatear directamente en la pestana 'Chat'."
                     ;;
             esac
         """.trimIndent() + "\n"
@@ -311,7 +320,7 @@ class RootfsManager(
                         echo "{\"sessionKey\":\"${'$'}token\",\"provider\":\"anthropic\"}" > "${'$'}HOME/.claude.json"
                         echo ""
                         echo "✅ Autenticado correctamente con Claude!"
-                        echo "Guardado en ~/.claude.json"
+                        echo "Guardado en ~/.claude.json y sincronizado con el Chat."
                     else
                         echo "Cancelado."
                     fi
@@ -323,16 +332,26 @@ class RootfsManager(
                         exec "${binDir.absolutePath}/npx" "@anthropic-ai/claude-code" "${'$'}@"
                     else
                         echo "=== Termdroid Claude Helper ==="
-                        echo "Comandos:"
-                        echo "  claude login  -> Iniciar sesion abriendo Brave/navegador"
-                        echo ""
                         if [ -f "${'$'}HOME/.claude.json" ]; then
-                            echo "Estado: Sesion guardada en ~/.claude.json"
+                            echo "🟣 Estado: Sesion guardada en ~/.claude.json"
+                            echo "Comandos disponibles:"
+                            echo "  claude login   -> Re-autenticar o cambiar token"
+                            echo "  setup-alpine   -> Instalar Node.js para CLI nativo"
+                            echo ""
+                            echo "Tip: El agente ya esta conectado en la pestana 'Chat'."
                         else
-                            echo "Estado: No autenticado. Ejecuta 'claude login'."
+                            echo "🟡 Estado: No autenticado."
+                            printf "¿Deseas abrir Brave para iniciar sesion ahora? (s/n): "
+                            read resp
+                            case "${'$'}resp" in
+                                s|S|y|Y)
+                                    sh "${binDir.absolutePath}/claude" login
+                                    ;;
+                                *)
+                                    echo "Podes iniciar sesion en cualquier momento con 'claude login'."
+                                    ;;
+                            esac
                         fi
-                        echo ""
-                        echo "Tip: Tambien podes chatear directamente en la pestana 'Chat'."
                     fi
                     ;;
             esac
