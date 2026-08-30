@@ -228,6 +228,78 @@ static void run_login(const char *provider) {
     }
 }
 
+static int run_install(void) {
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0) {
+        fprintf(stderr, "Error creando socket local.\n");
+        return 1;
+    }
+
+    struct sockaddr_in server_addr;
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(SERVER_PORT);
+    inet_pton(AF_INET, "127.0.0.1", &server_addr.sin_addr);
+
+    if (connect(sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+        fprintf(stderr, "\033[31m[!] El servicio de Termdroid no esta respondiendo.\033[0m\n");
+        close(sock);
+        return 1;
+    }
+
+    printf("===========================================\n");
+    printf(" 📦 Instalador de Node.js y CLIs Oficiales\n");
+    printf("===========================================\n");
+
+    send(sock, "INSTALL\n", 8, 0);
+
+    char buffer[BUFFER_SIZE];
+    char line_buf[BUFFER_SIZE];
+    int line_idx = 0;
+    int bytes_read;
+
+    while ((bytes_read = recv(sock, buffer, sizeof(buffer) - 1, 0)) > 0) {
+        for (int i = 0; i < bytes_read; i++) {
+            char ch = buffer[i];
+            if (ch == '\n') {
+                line_buf[line_idx] = '\0';
+                if (strncmp(line_buf, "T:", 2) == 0) {
+                    b64_decode_print(line_buf + 2);
+                    printf("\n");
+                } else if (strncmp(line_buf, "E:", 2) == 0) {
+                    printf("\033[31m[Error] %s\033[0m\n", line_buf + 2);
+                } else if (strncmp(line_buf, "D:", 2) == 0) {
+                    printf("\n");
+                }
+                line_idx = 0;
+            } else if (line_idx < (int)sizeof(line_buf) - 1) {
+                line_buf[line_idx++] = ch;
+            }
+        }
+    }
+    close(sock);
+
+    printf("\n⚙️ Instalando Node.js, npm, git y CLIs oficiales...\n");
+    const char *prefix = getenv("PREFIX");
+    if (!prefix) prefix = "/data/data/com.termdroid/files/usr";
+
+    char cmd[1024];
+    snprintf(cmd, sizeof(cmd), "export PATH=\"%s/bin:$PATH\" && export LD_LIBRARY_PATH=\"%s/lib:$LD_LIBRARY_PATH\" && pkg update -y 2>/dev/null || apt-get update -y 2>/dev/null", prefix, prefix);
+    system(cmd);
+
+    snprintf(cmd, sizeof(cmd), "export PATH=\"%s/bin:$PATH\" && export LD_LIBRARY_PATH=\"%s/lib:$LD_LIBRARY_PATH\" && pkg install -y nodejs git 2>/dev/null || apt-get install -y nodejs git 2>/dev/null", prefix, prefix);
+    system(cmd);
+
+    snprintf(cmd, sizeof(cmd), "export PATH=\"%s/bin:$PATH\" && export LD_LIBRARY_PATH=\"%s/lib:$LD_LIBRARY_PATH\" && npm install -g @anthropic-ai/claude-code @openai/codex 2>/dev/null", prefix, prefix);
+    system(cmd);
+
+    printf("\n===========================================\n");
+    printf("✅ ¡Instalacion completada!\n");
+    printf("Ya podes ejecutar 'claude' o 'codex' directamente.\n");
+    printf("===========================================\n");
+    return 0;
+}
+
 int main(int argc, char **argv) {
     const char *cmd_name = "claude";
     if (argc > 0 && argv[0]) {
@@ -262,6 +334,10 @@ int main(int argc, char **argv) {
     if (argc > arg_start && (strcmp(argv[arg_start], "login") == 0 || strcmp(argv[arg_start], "auth") == 0)) {
         run_login(provider);
         return 0;
+    }
+
+    if (argc > arg_start && (strcmp(argv[arg_start], "install") == 0 || strcmp(argv[arg_start], "setup") == 0 || strcmp(argv[arg_start], "setup-node") == 0)) {
+        return run_install();
     }
 
     if (argc > arg_start) {

@@ -13,6 +13,7 @@ import com.termdroid.agent.TransportFactory
 import com.termdroid.core.SecretStore
 import com.termdroid.exec.ExecEnvironment
 import com.termdroid.probe.CapabilityProbe
+import com.termdroid.rootfs.NodeInstaller
 import com.termdroid.tools.android.AndroidToolset
 import com.termdroid.tools.unix.UnixToolset
 import kotlinx.coroutines.CoroutineScope
@@ -62,6 +63,19 @@ object AgentCliServer {
                 val writer = PrintWriter(s.getOutputStream(), true)
 
                 val line = reader.readLine() ?: return
+
+                if (line.startsWith("INSTALL")) {
+                    val env = ExecEnvironment(app)
+                    val prefix = env.prefix
+                    val cacheDir = app.cacheDir
+                    NodeInstaller.installBootstrap(prefix, cacheDir) { p ->
+                        val b64 = Base64.encodeToString(p.toByteArray(), Base64.NO_WRAP)
+                        writer.println("T:$b64\n")
+                    }
+                    writer.println("D:")
+                    return
+                }
+
                 if (!line.startsWith("RUN ")) {
                     writer.println("E:Comando no reconocido.")
                     writer.println("D:")

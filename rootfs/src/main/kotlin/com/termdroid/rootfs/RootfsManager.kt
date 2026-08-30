@@ -169,18 +169,28 @@ class RootfsManager(
             export PREFIX="${prefix.absolutePath}"
             export HOME="${homeDir.absolutePath}"
             export TMPDIR="${cacheDir.absolutePath}"
-            export PATH="${binDir.absolutePath}:${nativeLibDir.absolutePath}:/system/bin:/system/xbin:${'$'}PATH"
+            export PATH="${prefix.absolutePath}/bin:${binDir.absolutePath}:${nativeLibDir.absolutePath}:/system/bin:/system/xbin:${'$'}PATH"
+            export LD_LIBRARY_PATH="${prefix.absolutePath}/lib:${nativeLibDir.absolutePath}:${'$'}LD_LIBRARY_PATH"
+            export NODE_PATH="${prefix.absolutePath}/lib/node_modules"
             export PS1='termdroid:\w\$ '
 
             claude() {
-                if [ -f "${nativeLibDir.absolutePath}/libtdcli.so" ]; then
+                if [ -f "${prefix.absolutePath}/bin/claude" ]; then
+                    "${prefix.absolutePath}/bin/claude" "${'$'}@"
+                elif [ -f "${prefix.absolutePath}/lib/node_modules/@anthropic-ai/claude-code/cli.mjs" ]; then
+                    "${prefix.absolutePath}/bin/node" "${prefix.absolutePath}/lib/node_modules/@anthropic-ai/claude-code/cli.mjs" "${'$'}@"
+                elif [ -f "${nativeLibDir.absolutePath}/libtdcli.so" ]; then
                     "${nativeLibDir.absolutePath}/libtdcli.so" claude "${'$'}@"
                 else
                     sh "${binDir.absolutePath}/claude" "${'$'}@"
                 fi
             }
             codex() {
-                if [ -f "${nativeLibDir.absolutePath}/libtdcli.so" ]; then
+                if [ -f "${prefix.absolutePath}/bin/codex" ]; then
+                    "${prefix.absolutePath}/bin/codex" "${'$'}@"
+                elif [ -f "${prefix.absolutePath}/lib/node_modules/@openai/codex/cli.mjs" ]; then
+                    "${prefix.absolutePath}/bin/node" "${prefix.absolutePath}/lib/node_modules/@openai/codex/cli.mjs" "${'$'}@"
+                elif [ -f "${nativeLibDir.absolutePath}/libtdcli.so" ]; then
                     "${nativeLibDir.absolutePath}/libtdcli.so" codex "${'$'}@"
                 else
                     sh "${binDir.absolutePath}/codex" "${'$'}@"
@@ -201,19 +211,34 @@ class RootfsManager(
                 fi
             }
             node() {
-                sh "${binDir.absolutePath}/node" "${'$'}@"
+                if [ -f "${prefix.absolutePath}/bin/node" ]; then
+                    "${prefix.absolutePath}/bin/node" "${'$'}@"
+                else
+                    echo "Node.js no esta instalado. Ejecuta 'setup-environment' para instalarlo."
+                fi
             }
             npm() {
-                sh "${binDir.absolutePath}/npm" "${'$'}@"
+                if [ -f "${prefix.absolutePath}/bin/npm" ]; then
+                    "${prefix.absolutePath}/bin/npm" "${'$'}@"
+                else
+                    echo "npm no esta instalado. Ejecuta 'setup-environment' para instalarlo."
+                fi
             }
             termdroid() {
                 sh "${binDir.absolutePath}/termdroid" "${'$'}@"
             }
-            setup-alpine() {
-                sh "${binDir.absolutePath}/setup-alpine" "${'$'}@"
+            setup-environment() {
+                if [ -f "${nativeLibDir.absolutePath}/libtdcli.so" ]; then
+                    "${nativeLibDir.absolutePath}/libtdcli.so" install
+                else
+                    sh "${binDir.absolutePath}/setup-environment"
+                fi
+            }
+            setup-node() {
+                setup-environment
             }
             install-node() {
-                sh "${binDir.absolutePath}/setup-alpine" "${'$'}@"
+                setup-environment
             }
             xdg-open() {
                 am start -a android.intent.action.VIEW -d "${'$'}1" >/dev/null 2>&1
@@ -232,39 +257,23 @@ class RootfsManager(
     }
 
     private fun setupAlpineInstaller() {
-        val target = File(binDir, "setup-alpine")
+        val target = File(binDir, "setup-environment")
         val script = """
             #!/system/bin/sh
-            echo "==========================================="
-            echo " 📦 Instalador de Node.js & Alpine Linux"
-            echo "==========================================="
-
-            ARCH="${'$'}(uname -m)"
-            case "${'$'}ARCH" in
-                aarch64|arm64)
-                    ALPINE_ARCH="aarch64"
-                    ;;
-                x86_64|amd64)
-                    ALPINE_ARCH="x86_64"
-                    ;;
-                *)
-                    ALPINE_ARCH="aarch64"
-                    ;;
-            esac
-
-            TARGET_DIR="${prefix.absolutePath}/alpine"
-            mkdir -p "${'$'}TARGET_DIR" "${binDir.absolutePath}" "${libDir.absolutePath}" "${homeDir.absolutePath}"
-
-            echo "Arquitectura detectada: ${'$'}ALPINE_ARCH"
-            echo "Nota: Podes usar 'claude', 'codex' o 'agy' directamente en la terminal sin necesidad de Node."
-            echo "==========================================="
+            if [ -f "${nativeLibDir.absolutePath}/libtdcli.so" ]; then
+                exec "${nativeLibDir.absolutePath}/libtdcli.so" install
+            fi
         """.trimIndent() + "\n"
         target.writeText(script)
         target.setExecutable(true, false)
 
-        val targetAlias = File(binDir, "install-node")
+        val targetAlias = File(binDir, "setup-node")
         targetAlias.writeText(script)
         targetAlias.setExecutable(true, false)
+
+        val targetAlias2 = File(binDir, "install-node")
+        targetAlias2.writeText(script)
+        targetAlias2.setExecutable(true, false)
     }
 
     fun installCodexWrapper(): File {
@@ -272,7 +281,17 @@ class RootfsManager(
         val codexBin = File(binDir, "codex")
         val script = """
             #!/system/bin/sh
-            if [ -f "${nativeLibDir.absolutePath}/libtdcli.so" ]; then
+            export PREFIX="${prefix.absolutePath}"
+            export HOME="${homeDir.absolutePath}"
+            export PATH="${prefix.absolutePath}/bin:${binDir.absolutePath}:${nativeLibDir.absolutePath}:/system/bin:/system/xbin"
+            export LD_LIBRARY_PATH="${prefix.absolutePath}/lib:${nativeLibDir.absolutePath}"
+            export NODE_PATH="${prefix.absolutePath}/lib/node_modules"
+
+            if [ -f "${prefix.absolutePath}/bin/codex" ]; then
+                exec "${prefix.absolutePath}/bin/codex" "${'$'}@"
+            elif [ -f "${prefix.absolutePath}/lib/node_modules/@openai/codex/cli.mjs" ]; then
+                exec "${prefix.absolutePath}/bin/node" "${prefix.absolutePath}/lib/node_modules/@openai/codex/cli.mjs" "${'$'}@"
+            elif [ -f "${nativeLibDir.absolutePath}/libtdcli.so" ]; then
                 exec "${nativeLibDir.absolutePath}/libtdcli.so" codex "${'$'}@"
             else
                 echo "Termdroid CLI inicializando..."
@@ -318,7 +337,17 @@ class RootfsManager(
         val claudeBin = File(binDir, "claude")
         val script = """
             #!/system/bin/sh
-            if [ -f "${nativeLibDir.absolutePath}/libtdcli.so" ]; then
+            export PREFIX="${prefix.absolutePath}"
+            export HOME="${homeDir.absolutePath}"
+            export PATH="${prefix.absolutePath}/bin:${binDir.absolutePath}:${nativeLibDir.absolutePath}:/system/bin:/system/xbin"
+            export LD_LIBRARY_PATH="${prefix.absolutePath}/lib:${nativeLibDir.absolutePath}"
+            export NODE_PATH="${prefix.absolutePath}/lib/node_modules"
+
+            if [ -f "${prefix.absolutePath}/bin/claude" ]; then
+                exec "${prefix.absolutePath}/bin/claude" "${'$'}@"
+            elif [ -f "${prefix.absolutePath}/lib/node_modules/@anthropic-ai/claude-code/cli.mjs" ]; then
+                exec "${prefix.absolutePath}/bin/node" "${prefix.absolutePath}/lib/node_modules/@anthropic-ai/claude-code/cli.mjs" "${'$'}@"
+            elif [ -f "${nativeLibDir.absolutePath}/libtdcli.so" ]; then
                 exec "${nativeLibDir.absolutePath}/libtdcli.so" claude "${'$'}@"
             else
                 echo "Termdroid CLI inicializando..."
