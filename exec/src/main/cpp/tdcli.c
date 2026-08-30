@@ -257,6 +257,7 @@ static int run_install(void) {
     char line_buf[BUFFER_SIZE];
     int line_idx = 0;
     int bytes_read;
+    int install_failed = 0;
 
     while ((bytes_read = recv(sock, buffer, sizeof(buffer) - 1, 0)) > 0) {
         for (int i = 0; i < bytes_read; i++) {
@@ -268,6 +269,7 @@ static int run_install(void) {
                     printf("\n");
                 } else if (strncmp(line_buf, "E:", 2) == 0) {
                     printf("\033[31m[Error] %s\033[0m\n", line_buf + 2);
+                    install_failed = 1;
                 } else if (strncmp(line_buf, "D:", 2) == 0) {
                     printf("\n");
                 }
@@ -279,15 +281,7 @@ static int run_install(void) {
     }
     close(sock);
 
-    printf("\n⚙️ Instalando Node.js, npm y CLIs oficiales...\n");
-    const char *prefix = getenv("PREFIX");
-    if (!prefix) prefix = "/data/data/com.termdroid/files/usr";
-
-    char cmd[2048];
-    snprintf(cmd, sizeof(cmd), "\"%s/bin/alpine-sh\" -c \"apk add --no-cache nodejs npm git && npm install -g @anthropic-ai/claude-code @openai/codex\"", prefix);
-    int res = system(cmd);
-
-    if (res == 0) {
+    if (!install_failed) {
         printf("\n===========================================\n");
         printf("✅ ¡Instalacion completada con exito!\n");
         printf("Escribe 'claude' o 'codex' para iniciar sesion.\n");
@@ -297,7 +291,7 @@ static int run_install(void) {
         printf("⚠️ Hubo advertencias o errores durante la instalacion.\n");
         printf("===========================================\n");
     }
-    return res;
+    return install_failed;
 }
 
 int main(int argc, char **argv) {

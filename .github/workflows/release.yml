@@ -7,6 +7,9 @@ on:
 
 jobs:
   release:
+    concurrency:
+      group: release-${{ github.ref_name }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -40,15 +43,34 @@ jobs:
           cp app/build/outputs/apk/release/app-universal-release.apk release-assets/termdroid-universal.apk
           cp app/build/outputs/bundle/release/app-release.aab release-assets/termdroid.aab
           cd release-assets
-          sha256sum *.apk *.aab > checksums.txt
+          sha256sum -- *.apk *.aab > checksums.txt
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            release-assets/termdroid-arm64-v8a.apk
-            release-assets/termdroid-x86_64.apk
-            release-assets/termdroid-universal.apk
-            release-assets/termdroid.aab
-            release-assets/checksums.txt
-          generate_release_notes: true
+      - name: Validate release assets
+        run: python scripts/verify_release_assets.py release-assets
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --generate-notes --title "Termdroid $tag"
+          for asset in \
+            termdroid-arm64-v8a.apk \
+            termdroid-x86_64.apk \
+            termdroid-universal.apk \
+            termdroid.aab \
+            checksums.txt
+          do
+            gh release upload "$tag" "release-assets/$asset" --clobber
+          done
+
+          actual="$(gh release view "$tag" --json assets --jq '.assets[].name')"
+          for asset in \
+            termdroid-arm64-v8a.apk \
+            termdroid-x86_64.apk \
+            termdroid-universal.apk \
+            termdroid.aab \
+            checksums.txt
+          do
+            grep -Fxq "$asset" <<<"$actual" || { echo "Falta asset publicado: $asset"; exit 1; }
+          done

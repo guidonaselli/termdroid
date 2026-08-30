@@ -10,6 +10,9 @@ build/
 local.properties
 *.apk
 *.log
+*.pyc
+__pycache__/
 .memsearch/
+.agents/
 rootfs/prebuilt/
 rootfs/.rust-build/

@@ -28,14 +28,12 @@ object NodeInstaller {
 
     fun isClaudeInstalled(prefix: File): Boolean {
         val alpineDir = File(prefix, "alpine")
-        val cliMjs = File(alpineDir, "usr/lib/node_modules/@anthropic-ai/claude-code/cli.mjs")
-        return cliMjs.exists()
+        return File(alpineDir, "usr/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe").exists()
     }
 
     fun isCodexInstalled(prefix: File): Boolean {
         val alpineDir = File(prefix, "alpine")
-        val cliMjs = File(alpineDir, "usr/lib/node_modules/@openai/codex/cli.mjs")
-        return cliMjs.exists()
+        return File(alpineDir, "usr/lib/node_modules/@openai/codex/bin/codex.js").exists()
     }
 
     /**
@@ -46,32 +44,127 @@ object NodeInstaller {
         cacheDir: File,
         onProgress: (String) -> Unit = {},
     ): Result<Unit> = withContext(Dispatchers.IO) {
-        runCatching {
-            val arch = detectArch()
-            val tarGzName = "alpine-minirootfs-$ALPINE_RELEASE-$arch.tar.gz"
-            val urlStr = "https://dl-cdn.alpinelinux.org/alpine/$ALPINE_VERSION/releases/$arch/$tarGzName"
-            val targetTarGz = File(cacheDir, tarGzName)
-            val alpineDir = File(prefix, "alpine")
+        installEnvironment(
+            prepare = {
+                val arch = detectArch()
+                val tarGzName = "alpine-minirootfs-$ALPINE_RELEASE-$arch.tar.gz"
+                val urlStr = "https://dl-cdn.alpinelinux.org/alpine/$ALPINE_VERSION/releases/$arch/$tarGzName"
+                val targetTarGz = File(cacheDir, tarGzName)
+                val alpineDir = File(prefix, "alpine")
+                val stagingDir = File(prefix, "alpine.installing")
 
-            onProgress("Descargando Alpine Linux ($arch)...")
-            var lastReportedPct = -1
-            downloadFile(urlStr, targetTarGz) { pct ->
-                if (pct % 25 == 0 && pct != lastReportedPct) {
-                    lastReportedPct = pct
-                    onProgress("Descargando Alpine Linux: $pct%")
+                onProgress("Descargando Alpine Linux ($arch)...")
+                var lastReportedPct = -1
+                downloadFile(urlStr, targetTarGz) { pct ->
+                    if (pct % 25 == 0 && pct != lastReportedPct) {
+                        lastReportedPct = pct
+                        onProgress("Descargando Alpine Linux: $pct%")
+                    }
+                }
+
+                onProgress("Extrayendo sistema Linux...")
+                stagingDir.deleteRecursively()
+                extractTarGz(targetTarGz, stagingDir)
+                targetTarGz.delete()
+
+                alpineDir.deleteRecursively()
+                check(stagingDir.renameTo(alpineDir)) { "No se pudo activar el sistema Linux descargado" }
+
+                onProgress("Configurando DNS y repositorios...")
+                configureAlpine(alpineDir, prefix, arch)
+            },
+            install = {
+                onProgress("Instalando Node.js, npm y Git...")
+                installPackages(prefix, onProgress)
+            },
+            validate = {
+                onProgress("Validando Node.js y CLIs...")
+                validateInstallation(prefix)
+                onProgress("Entorno completo instalado correctamente.")
+            },
+        )
+    }
+
+    internal fun installEnvironment(
+        prepare: () -> Unit,
+        install: () -> Unit,
+        validate: () -> Unit,
+    ): Result<Unit> = runCatching {
+        prepare()
+        install()
+        validate()
+    }
+
+    private fun installPackages(prefix: File, onProgress: (String) -> Unit) {
+        val alpineDir = File(prefix, "alpine")
+        val apk = File(alpineDir, "sbin/apk")
+        runAlpineBinary(
+            alpineDir,
+            apk,
+            listOf(
+                "--root", alpineDir.absolutePath,
+                "--keys-dir", "/etc/apk/keys",
+                "--repositories-file", "/etc/apk/repositories",
+                "--no-cache",
+                "--no-scripts",
+                "add", "nodejs", "npm", "git",
+            ),
+            onProgress,
+        )
+
+        runScript(
+            File(prefix, "bin/npm"),
+            listOf(
+                "install", "--global",
+                "--script-shell", File(prefix, "bin/alpine-sh").absolutePath,
+                "--prefix", File(alpineDir, "usr").absolutePath,
+                "@anthropic-ai/claude-code", "@openai/codex",
+            ),
+            onProgress,
+        )
+    }
+
+    private fun validateInstallation(prefix: File) {
+        listOf(
+            "Node.js" to Pair(File(prefix, "bin/node"), listOf("--version")),
+            "npm" to Pair(File(prefix, "bin/npm"), listOf("--version")),
+            "Claude Code" to Pair(File(prefix, "bin/claude"), listOf("--version")),
+            "Codex" to Pair(File(prefix, "bin/codex"), listOf("--version")),
+        ).forEach { (name, command) ->
+            runScript(command.first, command.second) { }
+                .takeIf { it.isNotBlank() }
+                ?: error("$name no devolvio una version valida")
+        }
+    }
+
+    private fun runAlpineBinary(
+        alpineDir: File,
+        executable: File,
+        args: List<String>,
+        onOutput: (String) -> Unit,
+    ): String {
+        val arch = detectArch()
+        val linker = File(alpineDir, "lib/${muslLinkerName(arch)}")
+        val libPath = "${File(alpineDir, "lib").absolutePath}:${File(alpineDir, "usr/lib").absolutePath}"
+        return runProcess(listOf(linker.absolutePath, "--library-path", libPath, executable.absolutePath) + args, onOutput)
+    }
+
+    private fun runScript(script: File, args: List<String>, onOutput: (String) -> Unit): String =
+        runProcess(listOf("/system/bin/sh", script.absolutePath) + args, onOutput)
+
+    private fun runProcess(command: List<String>, onOutput: (String) -> Unit): String {
+        val process = ProcessBuilder(command).redirectErrorStream(true).start()
+        val output = buildString {
+            process.inputStream.bufferedReader().useLines { lines ->
+                lines.forEach { line ->
+                    appendLine(line)
+                    onOutput(line)
                 }
             }
-
-            onProgress("Extrayendo sistema Linux...")
-            alpineDir.mkdirs()
-            extractTarGz(targetTarGz, alpineDir)
-            targetTarGz.delete()
-
-            onProgress("Configurando DNS y repositorios...")
-            configureAlpine(alpineDir, prefix, arch)
-
-            onProgress("Sistema base Linux instalado correctamente.")
-        }
+        }.trim()
+        val exitCode = process.waitFor()
+        check(exitCode == 0) { "${command.firstOrNull().orEmpty()} fallo ($exitCode): $output" }
+        return output
     }
 
     private fun configureAlpine(alpineDir: File, prefix: File, arch: String) {
@@ -84,7 +177,7 @@ object NodeInstaller {
         repos.writeText("https://dl-cdn.alpinelinux.org/alpine/$ALPINE_VERSION/main\nhttps://dl-cdn.alpinelinux.org/alpine/$ALPINE_VERSION/community\n")
 
         val binDir = File(prefix, "bin").apply { mkdirs() }
-        val muslLinker = if (arch == "aarch64") "ld-musl-aarch64.so.1" else "ld-musl-x86_64.so.1"
+        val muslLinker = muslLinkerName(arch)
         val linkerPath = File(alpineDir, "lib/$muslLinker").absolutePath
         val libPath = "${File(alpineDir, "lib").absolutePath}:${File(alpineDir, "usr/lib").absolutePath}"
 
@@ -100,6 +193,7 @@ object NodeInstaller {
         val nodeWrapper = File(binDir, "node")
         nodeWrapper.writeText("""
             #!/system/bin/sh
+            for ICU_DIR in "${File(alpineDir, "usr/share/icu").absolutePath}"/*; do export NODE_ICU_DATA="${'$'}ICU_DIR"; break; done
             if [ -f "${File(alpineDir, "usr/bin/node").absolutePath}" ]; then
                 exec "$linkerPath" --library-path "$libPath" "${File(alpineDir, "usr/bin/node").absolutePath}" "${'$'}@"
             else
@@ -112,6 +206,8 @@ object NodeInstaller {
         val npmWrapper = File(binDir, "npm")
         npmWrapper.writeText("""
             #!/system/bin/sh
+            export HOME="${File(prefix.parentFile, "home").absolutePath}"
+            export PATH="${binDir.absolutePath}:/system/bin:/system/xbin"
             if [ -f "${File(alpineDir, "usr/bin/node").absolutePath}" ]; then
                 exec "$linkerPath" --library-path "$libPath" "${File(alpineDir, "usr/bin/node").absolutePath}" "${File(alpineDir, "usr/lib/node_modules/npm/bin/npm-cli.js").absolutePath}" "${'$'}@"
             else
@@ -124,7 +220,7 @@ object NodeInstaller {
         val claudeWrapper = File(binDir, "claude")
         claudeWrapper.writeText("""
             #!/system/bin/sh
-            CLI_PATH="${File(alpineDir, "usr/lib/node_modules/@anthropic-ai/claude-code/cli.mjs").absolutePath}"
+            CLI_PATH="${File(alpineDir, "usr/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe").absolutePath}"
             if [ -f "${'$'}CLI_PATH" ]; then
                 exec "$linkerPath" --library-path "$libPath" "${File(alpineDir, "usr/bin/node").absolutePath}" "${'$'}CLI_PATH" "${'$'}@"
             else
@@ -137,7 +233,7 @@ object NodeInstaller {
         val codexWrapper = File(binDir, "codex")
         codexWrapper.writeText("""
             #!/system/bin/sh
-            CLI_PATH="${File(alpineDir, "usr/lib/node_modules/@openai/codex/cli.mjs").absolutePath}"
+            CLI_PATH="${File(alpineDir, "usr/lib/node_modules/@openai/codex/bin/codex.js").absolutePath}"
             if [ -f "${'$'}CLI_PATH" ]; then
                 exec "$linkerPath" --library-path "$libPath" "${File(alpineDir, "usr/bin/node").absolutePath}" "${'$'}CLI_PATH" "${'$'}@"
             else
@@ -187,6 +283,9 @@ object NodeInstaller {
                 val typeFlag = header[156].toInt().toChar()
 
                 val entryFile = File(targetDir, name)
+                check(entryFile.canonicalPath.startsWith(targetDir.canonicalPath + File.separator)) {
+                    "Entrada insegura en rootfs: $name"
+                }
                 if (typeFlag == '5' || name.endsWith("/")) {
                     entryFile.mkdirs()
                 } else if (typeFlag == '2') {
@@ -228,10 +327,14 @@ object NodeInstaller {
         return when {
             primaryAbi.contains("arm64") || primaryAbi.contains("aarch64") -> "aarch64"
             primaryAbi.contains("x86_64") || primaryAbi.contains("amd64") -> "x86_64"
-            primaryAbi.contains("arm") -> "armv7"
-            primaryAbi.contains("x86") || primaryAbi.contains("i686") -> "x86"
-            else -> "aarch64"
+            else -> error("ABI no soportada: ${Build.SUPPORTED_ABIS.joinToString()}")
         }
+    }
+
+    private fun muslLinkerName(arch: String): String = when (arch) {
+        "aarch64" -> "ld-musl-aarch64.so.1"
+        "x86_64" -> "ld-musl-x86_64.so.1"
+        else -> error("Arquitectura Alpine no soportada: $arch")
     }
 
     private fun downloadFile(urlStr: String, destination: File, onPercent: (Int) -> Unit) {

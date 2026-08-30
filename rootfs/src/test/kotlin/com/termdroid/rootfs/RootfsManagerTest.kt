@@ -1,6 +1,7 @@
 package com.termdroid.rootfs
 
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -51,8 +52,52 @@ class RootfsManagerTest {
     fun instalaWrapperDeClaude() {
         val claude = manager.installClaudeWrapper()
         assertTrue(claude.exists())
-        assertTrue(manager.hasClaude)
+        assertFalse(manager.hasClaude)
         assertTrue(claude.readText().contains("claude"))
+        assertFalse(claude.readText().contains("exec \"${manager.binDir.absolutePath}/claude\""))
+    }
+
+    @Test
+    fun wrappersNoCuentanComoRuntimeInstalado() {
+        manager.ensureBaseEnvironment()
+
+        assertFalse(manager.hasNode)
+        assertFalse(manager.hasClaude)
+    }
+
+    @Test
+    fun instalacionSeDetieneSiFallaLaPreparacion() {
+        var installs = 0
+        var validations = 0
+
+        val result = NodeInstaller.installEnvironment(
+            prepare = { error("fallo de descarga") },
+            install = { installs++ },
+            validate = { validations++ },
+        )
+
+        assertTrue(result.isFailure)
+        assertEquals(0, installs)
+        assertEquals(0, validations)
+    }
+
+    @Test
+    fun instalacionPuedeReintentarse() {
+        var prepares = 0
+        var installs = 0
+        var validations = 0
+
+        repeat(2) {
+            assertTrue(NodeInstaller.installEnvironment(
+                prepare = { prepares++ },
+                install = { installs++ },
+                validate = { validations++ },
+            ).isSuccess)
+        }
+
+        assertEquals(2, prepares)
+        assertEquals(2, installs)
+        assertEquals(2, validations)
     }
 
     @Test

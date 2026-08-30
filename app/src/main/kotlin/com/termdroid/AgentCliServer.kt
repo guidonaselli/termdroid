@@ -68,10 +68,11 @@ object AgentCliServer {
                     val env = ExecEnvironment(app)
                     val prefix = env.prefix
                     val cacheDir = app.cacheDir
-                    NodeInstaller.installFullEnvironment(prefix, cacheDir) { p ->
+                    val result = NodeInstaller.installFullEnvironment(prefix, cacheDir) { p ->
                         val b64 = Base64.encodeToString(p.toByteArray(), Base64.NO_WRAP)
                         writer.println("T:$b64")
                     }
+                    result.exceptionOrNull()?.let { writer.println("E:${it.message ?: "Fallo desconocido"}") }
                     writer.println("D:")
                     return
                 }

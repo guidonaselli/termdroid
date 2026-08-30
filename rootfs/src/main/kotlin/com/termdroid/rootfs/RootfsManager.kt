@@ -30,8 +30,8 @@ class RootfsManager(
     val tmpDir: File get() = File(prefix, "tmp")
 
     val isBaseInstalled: Boolean get() = File(binDir, "termdroid").exists()
-    val hasNode: Boolean get() = File(binDir, "node").exists()
-    val hasClaude: Boolean get() = File(binDir, "claude").exists()
+    val hasNode: Boolean get() = File(prefix, "alpine/usr/bin/node").exists()
+    val hasClaude: Boolean get() = File(prefix, "alpine/usr/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe").exists()
 
     /** Inicializa la estructura base del entorno Unix dentro del directorio privado. */
     fun ensureBaseEnvironment(): Boolean {
@@ -177,8 +177,8 @@ class RootfsManager(
             claude() {
                 if [ -f "${prefix.absolutePath}/bin/claude" ]; then
                     "${prefix.absolutePath}/bin/claude" "${'$'}@"
-                elif [ -f "${prefix.absolutePath}/alpine/usr/lib/node_modules/@anthropic-ai/claude-code/cli.mjs" ]; then
-                    "${prefix.absolutePath}/bin/node" "${prefix.absolutePath}/alpine/usr/lib/node_modules/@anthropic-ai/claude-code/cli.mjs" "${'$'}@"
+                elif [ -f "${prefix.absolutePath}/alpine/usr/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe" ]; then
+                    "${prefix.absolutePath}/bin/node" "${prefix.absolutePath}/alpine/usr/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe" "${'$'}@"
                 elif [ -f "${nativeLibDir.absolutePath}/libtdcli.so" ]; then
                     "${nativeLibDir.absolutePath}/libtdcli.so" claude "${'$'}@"
                 else
@@ -188,8 +188,8 @@ class RootfsManager(
             codex() {
                 if [ -f "${prefix.absolutePath}/bin/codex" ]; then
                     "${prefix.absolutePath}/bin/codex" "${'$'}@"
-                elif [ -f "${prefix.absolutePath}/alpine/usr/lib/node_modules/@openai/codex/cli.mjs" ]; then
-                    "${prefix.absolutePath}/bin/node" "${prefix.absolutePath}/alpine/usr/lib/node_modules/@openai/codex/cli.mjs" "${'$'}@"
+                elif [ -f "${prefix.absolutePath}/alpine/usr/lib/node_modules/@openai/codex/bin/codex.js" ]; then
+                    "${prefix.absolutePath}/bin/node" "${prefix.absolutePath}/alpine/usr/lib/node_modules/@openai/codex/bin/codex.js" "${'$'}@"
                 elif [ -f "${nativeLibDir.absolutePath}/libtdcli.so" ]; then
                     "${nativeLibDir.absolutePath}/libtdcli.so" codex "${'$'}@"
                 else
@@ -269,28 +269,12 @@ class RootfsManager(
             echo " 📦 Instalador de Node.js y CLIs Oficiales"
             echo "==========================================="
 
-            if [ ! -f "${prefix.absolutePath}/bin/alpine-sh" ]; then
-                echo "Descargando e instalando sistema base Linux..."
-                if [ -f "${nativeLibDir.absolutePath}/libtdcli.so" ]; then
-                    "${nativeLibDir.absolutePath}/libtdcli.so" install
-                fi
+            if [ ! -f "${nativeLibDir.absolutePath}/libtdcli.so" ]; then
+                echo "❌ Error: el instalador nativo no esta disponible."
+                exit 1
             fi
 
-            if [ -f "${prefix.absolutePath}/bin/alpine-sh" ]; then
-                echo "Instalando Node.js y npm oficiales..."
-                "${prefix.absolutePath}/bin/alpine-sh" -c "apk add --no-cache nodejs npm git"
-                echo "Instalando Claude Code CLI y OpenAI Codex..."
-                "${prefix.absolutePath}/bin/alpine-sh" -c "npm install -g @anthropic-ai/claude-code @openai/codex"
-            fi
-
-            if [ -f "${prefix.absolutePath}/alpine/usr/bin/node" ]; then
-                echo "==========================================="
-                echo "✅ ¡Instalacion completada con exito!"
-                echo "Ya podes escribir 'claude' o 'codex'."
-                echo "==========================================="
-            else
-                echo "❌ Error: Node.js no pudo instalarse."
-            fi
+            exec "${nativeLibDir.absolutePath}/libtdcli.so" install
         """.trimIndent() + "\n"
         target.writeText(script)
         target.setExecutable(true, false)
@@ -313,10 +297,8 @@ class RootfsManager(
             export HOME="${homeDir.absolutePath}"
             export PATH="${prefix.absolutePath}/bin:${binDir.absolutePath}:${nativeLibDir.absolutePath}:/system/bin:/system/xbin"
 
-            if [ -f "${prefix.absolutePath}/bin/codex" ]; then
-                exec "${prefix.absolutePath}/bin/codex" "${'$'}@"
-            elif [ -f "${prefix.absolutePath}/alpine/usr/lib/node_modules/@openai/codex/cli.mjs" ]; then
-                exec "${prefix.absolutePath}/bin/node" "${prefix.absolutePath}/alpine/usr/lib/node_modules/@openai/codex/cli.mjs" "${'$'}@"
+            if [ -f "${prefix.absolutePath}/alpine/usr/lib/node_modules/@openai/codex/bin/codex.js" ]; then
+                exec "${prefix.absolutePath}/bin/node" "${prefix.absolutePath}/alpine/usr/lib/node_modules/@openai/codex/bin/codex.js" "${'$'}@"
             elif [ -f "${nativeLibDir.absolutePath}/libtdcli.so" ]; then
                 exec "${nativeLibDir.absolutePath}/libtdcli.so" codex "${'$'}@"
             else
@@ -367,10 +349,8 @@ class RootfsManager(
             export HOME="${homeDir.absolutePath}"
             export PATH="${prefix.absolutePath}/bin:${binDir.absolutePath}:${nativeLibDir.absolutePath}:/system/bin:/system/xbin"
 
-            if [ -f "${prefix.absolutePath}/bin/claude" ]; then
-                exec "${prefix.absolutePath}/bin/claude" "${'$'}@"
-            elif [ -f "${prefix.absolutePath}/alpine/usr/lib/node_modules/@anthropic-ai/claude-code/cli.mjs" ]; then
-                exec "${prefix.absolutePath}/bin/node" "${prefix.absolutePath}/alpine/usr/lib/node_modules/@anthropic-ai/claude-code/cli.mjs" "${'$'}@"
+            if [ -f "${prefix.absolutePath}/alpine/usr/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe" ]; then
+                exec "${prefix.absolutePath}/bin/node" "${prefix.absolutePath}/alpine/usr/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe" "${'$'}@"
             elif [ -f "${nativeLibDir.absolutePath}/libtdcli.so" ]; then
                 exec "${nativeLibDir.absolutePath}/libtdcli.so" claude "${'$'}@"
             else
