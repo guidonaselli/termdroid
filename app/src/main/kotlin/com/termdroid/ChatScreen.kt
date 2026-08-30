@@ -450,6 +450,11 @@ private fun ProviderAuthPrompt(
                 )
             }
 
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val clipboardManager = remember {
+                context.getSystemService(android.content.ClipboardManager::class.java)
+            }
+
             if (selectedProvider == LlmProvider.CUSTOM) {
                 TextField(
                     value = baseUrl,
@@ -473,6 +478,14 @@ private fun ProviderAuthPrompt(
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text("Token / API Key (opcional)") },
                     singleLine = true,
+                    trailingIcon = {
+                        TextButton(onClick = {
+                            val clip = clipboardManager?.primaryClip?.getItemAt(0)?.text?.toString().orEmpty()
+                            if (clip.isNotBlank()) token = clip.trim()
+                        }) {
+                            Text("Pegar", fontSize = 11.sp)
+                        }
+                    },
                 )
             } else {
                 TextField(
@@ -491,6 +504,14 @@ private fun ProviderAuthPrompt(
                         )
                     },
                     singleLine = true,
+                    trailingIcon = {
+                        TextButton(onClick = {
+                            val clip = clipboardManager?.primaryClip?.getItemAt(0)?.text?.toString().orEmpty()
+                            if (clip.isNotBlank()) token = clip.trim()
+                        }) {
+                            Text("Pegar", fontSize = 11.sp)
+                        }
+                    },
                 )
             }
 

@@ -130,6 +130,10 @@ private fun TerminalPane(session: ShellSession, modifier: Modifier = Modifier) {
             }
         }
 
+        QuickCommandsRow(
+            onCommand = { cmd -> scope.launch { session.send("$cmd\n") } },
+        )
+
         KeyRow(
             onKey = { seq -> scope.launch { session.send(seq) } },
             onCopiar = {
@@ -137,6 +141,13 @@ private fun TerminalPane(session: ShellSession, modifier: Modifier = Modifier) {
                 cb?.setPrimaryClip(
                     android.content.ClipData.newPlainText("terminal", screen.fullText()),
                 )
+            },
+            onPegar = {
+                val cb = context.getSystemService(android.content.ClipboardManager::class.java)
+                val text = cb?.primaryClip?.getItemAt(0)?.text?.toString().orEmpty()
+                if (text.isNotEmpty()) {
+                    scope.launch { session.send(text) }
+                }
             },
         )
 
@@ -163,21 +174,66 @@ private fun TerminalPane(session: ShellSession, modifier: Modifier = Modifier) {
     }
 }
 
-/** Barra de teclas contextual. */
+/** Barra de comandos rápidos para terminal. */
 @Composable
-private fun KeyRow(onKey: (String) -> Unit, onCopiar: () -> Unit) {
+private fun QuickCommandsRow(onCommand: (String) -> Unit) {
+    val quicks = listOf(
+        "codex login",
+        "claude login",
+        "termdroid info",
+        "termdroid battery",
+        "ls -la",
+        "pwd",
+        "clear",
+    )
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface)
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 4.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        quicks.forEach { cmd ->
+            FilterChip(
+                selected = false,
+                onClick = { onCommand(cmd) },
+                label = { Text(cmd, fontFamily = FontFamily.Monospace, fontSize = 11.sp) },
+            )
+        }
+    }
+}
+
+/** Barra de teclas contextual para terminal. */
+@Composable
+private fun KeyRow(
+    onKey: (String) -> Unit,
+    onCopiar: () -> Unit,
+    onPegar: () -> Unit,
+) {
     val keys = listOf(
         "Esc" to "\u001B",
         "Tab" to "\t",
         "^C" to "\u0003",
         "^D" to "\u0004",
+        "^Z" to "\u001A",
         "^L" to "\u000C",
+        "↑" to "\u001B[A",
+        "↓" to "\u001B[B",
+        "←" to "\u001B[D",
+        "→" to "\u001B[C",
         "/" to "/",
         "|" to "|",
         "~" to "~",
         "-" to "-",
-        "↑" to "\u001B[A",
-        "↓" to "\u001B[B",
+        "_" to "_",
+        "$" to "$",
+        "&" to "&",
+        "\"" to "\"",
+        "'" to "'",
+        ";" to ";",
     )
 
     Row(
@@ -189,15 +245,19 @@ private fun KeyRow(onKey: (String) -> Unit, onCopiar: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
+        TextButton(onClick = onPegar) {
+            Text("📋 Pegar", fontFamily = FontFamily.Monospace, fontSize = 12.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+        }
+        TextButton(onClick = onCopiar) {
+            Text("📄 Copiar", fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+        }
         keys.forEach { (label, seq) ->
             TextButton(onClick = { onKey(seq) }) {
                 Text(label, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
             }
         }
-        TextButton(onClick = onCopiar) {
-            Text("Copiar", fontFamily = FontFamily.Monospace, fontSize = 13.sp)
-        }
     }
 }
 
 private val FONT_SIZE = 12.sp
+
