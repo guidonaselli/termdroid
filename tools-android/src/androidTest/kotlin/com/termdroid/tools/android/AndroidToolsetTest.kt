@@ -91,12 +91,12 @@ class AndroidToolsetTest {
     }
 
     @Test
-    fun shellPrivEsPrivilegiadoYElRestoDeLectura() {
+    fun shellPrivEsPrivilegiadoYElRestoSegunAccion() {
         tools.values.forEach { tool ->
-            if (tool.spec.name == "shell_priv") {
-                assertEquals(ToolRisk.PRIVILEGED, tool.risk)
-            } else {
-                assertEquals(tool.spec.name, ToolRisk.READ, tool.risk)
+            when (tool.spec.name) {
+                "shell_priv" -> assertEquals(ToolRisk.PRIVILEGED, tool.risk)
+                "clipboard", "tts_speak", "vibrate" -> assertEquals(ToolRisk.WRITE, tool.risk)
+                else -> assertEquals(tool.spec.name, ToolRisk.READ, tool.risk)
             }
         }
     }

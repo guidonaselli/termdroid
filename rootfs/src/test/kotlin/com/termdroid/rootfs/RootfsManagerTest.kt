@@ -56,6 +56,14 @@ class RootfsManagerTest {
     }
 
     @Test
+    fun inicializaWrappersDeHardware() {
+        manager.ensureBaseEnvironment()
+        assertTrue(File(manager.binDir, "termdroid-clipboard").exists())
+        assertTrue(File(manager.binDir, "termdroid-battery").exists())
+        assertTrue(File(manager.binDir, "termdroid-tts").exists())
+    }
+
+    @Test
     fun reseteaEntornoLimpiandoArchivos() {
         manager.ensureBaseEnvironment()
         File(manager.homeDir, "test.txt").writeText("data")

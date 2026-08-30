@@ -65,7 +65,17 @@ class AndroidToolset(
     }
 
     fun all(): List<AgentTool> =
-        listOf(ListAppsTool(), AppUsageTool(), DeviceStateTool(), NotificationsTool(), ShellPrivTool())
+        listOf(
+            ListAppsTool(),
+            AppUsageTool(),
+            DeviceStateTool(),
+            NotificationsTool(),
+            ShellPrivTool(),
+            ClipboardTool(),
+            BatteryInfoTool(),
+            TtsTool(),
+            VibrateTool(),
+        )
 
     private fun requireAccess(access: SpecialAccess): ToolOutcome? {
         if (access.isGranted(context)) return null
@@ -284,6 +294,166 @@ class AndroidToolset(
                     isError = true,
                 )
             }
+        }
+    }
+
+    private inner class ClipboardTool : AgentTool {
+        override val spec = ToolSpec(
+            name = "clipboard",
+            description = "Lee o escribe texto en el portapapeles del sistema.",
+            inputSchema = objectSchema(
+                "action" to stringProp("'get' para leer, 'set' para escribir. Por defecto 'get'."),
+                "text" to stringProp("Texto a copiar al portapapeles si action es 'set'."),
+                required = emptyList(),
+            ),
+        )
+        override val risk = ToolRisk.WRITE
+
+        override fun describe(input: JSONObject): String {
+            val act = input.optString("action", "get").lowercase()
+            return if (act == "set") "copiar texto al portapapeles" else "leer portapapeles"
+        }
+
+        override suspend fun execute(input: JSONObject): ToolOutcome = withContext(Dispatchers.Main) {
+            runCatching {
+                val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                val act = input.optString("action", "get").lowercase()
+                if (act == "set") {
+                    val text = input.optString("text")
+                    cm.setPrimaryClip(android.content.ClipData.newPlainText("termdroid", text))
+                    ToolOutcome("Texto copiado al portapapeles con exito.")
+                } else {
+                    val clip = cm.primaryClip
+                    val text = if (clip != null && clip.itemCount > 0) clip.getItemAt(0).coerceToText(context).toString() else ""
+                    ToolOutcome(JSONObject().put("clipboard", text).toString(2))
+                }
+            }.getOrElse { ToolOutcome("No se pudo acceder al portapapeles: $it", isError = true) }
+        }
+    }
+
+    private inner class BatteryInfoTool : AgentTool {
+        override val spec = ToolSpec(
+            name = "battery_info",
+            description = "Informacion detallada de la bateria: porcentaje, estado de carga, fuente de alimentacion, salud y temperatura.",
+            inputSchema = objectSchema(required = emptyList()),
+        )
+        override val risk = ToolRisk.READ
+
+        override fun describe(input: JSONObject) = "informacion de la bateria"
+
+        override suspend fun execute(input: JSONObject): ToolOutcome = withContext(Dispatchers.IO) {
+            runCatching {
+                val ifilter = android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+                val statusIntent = context.registerReceiver(null, ifilter)
+
+                val level = statusIntent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+                val scale = statusIntent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+                val pct = if (scale > 0 && level >= 0) (level * 100) / scale else -1
+
+                val status = statusIntent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+                val statusStr = when (status) {
+                    BatteryManager.BATTERY_STATUS_CHARGING -> "cargando"
+                    BatteryManager.BATTERY_STATUS_DISCHARGING -> "descargando"
+                    BatteryManager.BATTERY_STATUS_FULL -> "llena"
+                    BatteryManager.BATTERY_STATUS_NOT_CHARGING -> "no_cargando"
+                    else -> "desconocido"
+                }
+
+                val plugged = statusIntent?.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1) ?: -1
+                val plugStr = when (plugged) {
+                    BatteryManager.BATTERY_PLUGGED_AC -> "ac"
+                    BatteryManager.BATTERY_PLUGGED_USB -> "usb"
+                    BatteryManager.BATTERY_PLUGGED_WIRELESS -> "inalambrico"
+                    else -> "bateria"
+                }
+
+                val temp = (statusIntent?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) ?: 0) / 10.0
+                val health = statusIntent?.getIntExtra(BatteryManager.EXTRA_HEALTH, -1) ?: -1
+                val healthStr = when (health) {
+                    BatteryManager.BATTERY_HEALTH_GOOD -> "buena"
+                    BatteryManager.BATTERY_HEALTH_OVERHEAT -> "sobrecalentada"
+                    BatteryManager.BATTERY_HEALTH_DEAD -> "agotada"
+                    BatteryManager.BATTERY_HEALTH_OVER_VOLTAGE -> "sobrevoltaje"
+                    else -> "normal"
+                }
+
+                ToolOutcome(
+                    JSONObject()
+                        .put("percent", pct)
+                        .put("status", statusStr)
+                        .put("power_source", plugStr)
+                        .put("temperature_celsius", temp)
+                        .put("health", healthStr)
+                        .toString(2),
+                )
+            }.getOrElse { ToolOutcome("No se pudo leer el estado de la bateria: $it", isError = true) }
+        }
+    }
+
+    private inner class TtsTool : AgentTool {
+        override val spec = ToolSpec(
+            name = "tts_speak",
+            description = "Sintetiza voz a traves del altavoz del telefono usando Text-To-Speech.",
+            inputSchema = objectSchema(
+                "text" to stringProp("Texto a decir en voz alta."),
+                required = listOf("text"),
+            ),
+        )
+        override val risk = ToolRisk.WRITE
+
+        override fun describe(input: JSONObject) = "hablar: ${input.optString("text").take(40)}"
+
+        override suspend fun execute(input: JSONObject): ToolOutcome = withContext(Dispatchers.Main) {
+            val text = input.optString("text").ifBlank {
+                return@withContext ToolOutcome("Falta el parametro 'text'.", isError = true)
+            }
+            runCatching {
+                var ttsInstance: android.speech.tts.TextToSpeech? = null
+                ttsInstance = android.speech.tts.TextToSpeech(context) { status ->
+                    if (status == android.speech.tts.TextToSpeech.SUCCESS) {
+                        ttsInstance?.speak(text, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "termdroid_tts")
+                    }
+                }
+                ToolOutcome("Texto enviado a sintesis de voz.")
+            }.getOrElse { ToolOutcome("No se pudo sintetizar voz: $it", isError = true) }
+        }
+    }
+
+    private inner class VibrateTool : AgentTool {
+        override val spec = ToolSpec(
+            name = "vibrate",
+            description = "Genera una vibracion / feedback haptico en el telefono.",
+            inputSchema = objectSchema(
+                "duration_ms" to intProp("Duracion de la vibracion en milisegundos. Por defecto 300."),
+                required = emptyList(),
+            ),
+        )
+        override val risk = ToolRisk.WRITE
+
+        override fun describe(input: JSONObject) = "vibrar ${input.optInt("duration_ms", 300)}ms"
+
+        override suspend fun execute(input: JSONObject): ToolOutcome = withContext(Dispatchers.IO) {
+            runCatching {
+                val ms = input.optInt("duration_ms", 300).coerceIn(50, 5000).toLong()
+                val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? android.os.VibratorManager
+                    vm?.defaultVibrator ?: @Suppress("DEPRECATION") (context.getSystemService(Context.VIBRATOR_SERVICE) as? android.os.Vibrator)
+                } else {
+                    @Suppress("DEPRECATION")
+                    context.getSystemService(Context.VIBRATOR_SERVICE) as? android.os.Vibrator
+                }
+                if (vibrator != null && vibrator.hasVibrator()) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        vibrator.vibrate(android.os.VibrationEffect.createOneShot(ms, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
+                    } else {
+                        @Suppress("DEPRECATION")
+                        vibrator.vibrate(ms)
+                    }
+                    ToolOutcome("Vibracion ejecutada ($ms ms).")
+                } else {
+                    ToolOutcome("El dispositivo no tiene motor de vibracion disponible.")
+                }
+            }.getOrElse { ToolOutcome("No se pudo ejecutar la vibracion: $it", isError = true) }
         }
     }
 }

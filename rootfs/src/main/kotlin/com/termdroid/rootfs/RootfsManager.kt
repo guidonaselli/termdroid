@@ -43,6 +43,7 @@ class RootfsManager(
         setupToolWrapper("rg")
         setupToolWrapper("jaq")
         setupTermdroidCli()
+        setupHardwareCliWrappers()
 
         return true
     }
@@ -53,6 +54,37 @@ class RootfsManager(
         if (packaged.exists()) {
             val content = "#!/system/bin/sh\nexec \"${packaged.absolutePath}\" \"$@\"\n"
             target.writeText(content)
+            target.setExecutable(true, false)
+        }
+    }
+
+    private fun setupHardwareCliWrappers() {
+        val helpers = mapOf(
+            "termdroid-clipboard" to """
+                #!/system/bin/sh
+                case "${'$'}1" in
+                    set)
+                        shift
+                        echo "${'$'}*" | termdroid clipboard set
+                        ;;
+                    *)
+                        termdroid clipboard get
+                        ;;
+                esac
+            """.trimIndent() + "\n",
+            "termdroid-battery" to """
+                #!/system/bin/sh
+                termdroid battery
+            """.trimIndent() + "\n",
+            "termdroid-tts" to """
+                #!/system/bin/sh
+                termdroid tts "${'$'}*"
+            """.trimIndent() + "\n",
+        )
+
+        helpers.forEach { (name, script) ->
+            val target = File(binDir, name)
+            target.writeText(script)
             target.setExecutable(true, false)
         }
     }
@@ -77,6 +109,25 @@ class RootfsManager(
                         echo "Claude CLI: no instalado"
                     fi
                     ;;
+                battery)
+                    dumpsys battery 2>/dev/null || echo "Bateria: consultar via Termdroid App Tools"
+                    ;;
+                clipboard)
+                    case "${'$'}2" in
+                        set)
+                            shift 2
+                            echo "${'$'}*" > "${'$'}TMPDIR/clipboard.txt"
+                            echo "Copiado a buffer temporal."
+                            ;;
+                        *)
+                            cat "${'$'}TMPDIR/clipboard.txt" 2>/dev/null || echo ""
+                            ;;
+                    esac
+                    ;;
+                tts)
+                    shift
+                    echo "[TTS] ${'$'}*"
+                    ;;
                 reset)
                     echo "Borrando entorno Termdroid..."
                     rm -rf "${'$'}PREFIX" "${'$'}HOME"
@@ -84,7 +135,7 @@ class RootfsManager(
                     ;;
                 *)
                     echo "Termdroid CLI Helper"
-                    echo "Uso: termdroid [info | reset]"
+                    echo "Uso: termdroid [info | battery | clipboard | tts | reset]"
                     ;;
             esac
         """.trimIndent() + "\n"
