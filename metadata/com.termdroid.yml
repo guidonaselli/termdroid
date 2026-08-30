@@ -1,0 +1,32 @@
+Categories:
+  - System
+  - Development
+License: Apache-2.0
+AuthorName: Guido Naselli
+SourceCode: https://github.com/guidonaselli/termdroid
+IssueTracker: https://github.com/guidonaselli/termdroid/issues
+Changelog: https://github.com/guidonaselli/termdroid/releases
+
+AutoName: Termdroid
+Summary: Android terminal & autonomous agent runtime
+Description: |-
+  Termdroid is an autonomous agent runtime and terminal environment for Android.
+  It provides a native, isolated Unix userspace paired with an AI coding and
+  automation agent that can execute commands, inspect system status, and interact
+  with device hardware safely.
+
+RepoType: git
+Repo: https://github.com/guidonaselli/termdroid.git
+
+Builds:
+  - versionName: 0.1.3
+    versionCode: 1
+    commit: v0.1.3
+    subdir: app
+    gradle:
+      - assembleRelease
+
+AutoUpdateMode: Version %v
+UpdateCheckMode: Tags
+CurrentVersion: 0.1.3
+CurrentVersionCode: 1
