@@ -39,6 +39,7 @@ class RootfsManager(
         libDir.mkdirs()
         homeDir.mkdirs()
         tmpDir.mkdirs()
+        File(filesDir, "workspace").mkdirs()
 
         setupToolWrapper("rg")
         setupToolWrapper("jaq")
@@ -48,6 +49,7 @@ class RootfsManager(
         installCodexWrapper()
         setupAlpineInstaller()
         setupHomeProfile()
+        setupAgentInstructionFiles()
 
         return true
     }
@@ -264,5 +266,56 @@ class RootfsManager(
         claudeBin.writeText(script)
         claudeBin.setExecutable(true, false)
         return claudeBin
+    }
+
+    /** Escribe CLAUDE.md y AGENTS.md en home y workspace para instruir a cualquier agente de IA. */
+    fun setupAgentInstructionFiles() {
+        val agentDoc = """
+            # Termdroid Agent Policy & Device Capabilities
+
+            ## Overview
+            Termdroid is an autonomous agent runtime and isolated Unix terminal environment running on Android.
+
+            ## Environment & Paths
+            - **OS**: Android (Linux Kernel with Bionic libc and Toybox userspace).
+            - **Shell**: `/system/bin/sh` (toybox). Do not assume GNU coreutils flags.
+            - **Home**: `${'$'}HOME` (${homeDir.absolutePath})
+            - **Prefix**: `${'$'}PREFIX` (${prefix.absolutePath})
+            - **Workspace**: ${filesDir.absolutePath}/workspace
+            - **Temp**: `${'$'}TMPDIR` (${cacheDir.absolutePath})
+            - **External Storage**: `/sdcard` or `/storage/emulated/0`
+
+            ## Native Termdroid CLI Tools
+            - `termdroid info`: Display environment details and runtime status.
+            - `termdroid battery`: Query device battery capacity and status.
+            - `termdroid clipboard [get|set <text>]`: Read or update the Android system clipboard.
+            - `termdroid tts "<message>"`: Announce text aloud via Android Text-to-Speech engine.
+            - `rg`: Fast code search via Ripgrep native binary.
+            - `jaq`: JSON parser and query utility.
+
+            ## Android System Commands
+            - `am start -a android.intent.action.VIEW -d "<url>"`: Launch URL in web browser.
+            - `pm list packages`: List installed Android packages.
+            - `pm dump <package>`: Inspect app info and permissions.
+            - `dumpsys battery`: Battery diagnostics.
+            - `settings get [system|secure|global] <key>`: Query system settings.
+
+            ## Agent Guidelines & Security
+            1. **W^X & Execution**: Due to Android SELinux policies, run scripts via `sh <path>` or native library binaries.
+            2. **Permissions**: Handle missing permissions gracefully and inform the user.
+            3. **Conciseness**: Keep responses clear, compact, and formatted for mobile screens.
+            4. **Safety**: Never execute destructive actions without explicit user confirmation.
+        """.trimIndent() + "\n"
+
+        listOf(
+            File(homeDir, "CLAUDE.md"),
+            File(homeDir, "AGENTS.md"),
+            File(homeDir, "GEMINI.md"),
+            File(File(filesDir, "workspace"), "CLAUDE.md"),
+            File(File(filesDir, "workspace"), "AGENTS.md"),
+            File(File(prefix, "etc").apply { mkdirs() }, "CLAUDE.md"),
+        ).forEach { file ->
+            file.writeText(agentDoc)
+        }
     }
 }
