@@ -70,11 +70,65 @@ class SecretStore(context: Context) {
         const val TAG_BITS = 128
 
         const val ANTHROPIC_API_KEY = "anthropic_api_key"
+        const val ACTIVE_PROVIDER = "active_provider"
+        const val GEMINI_TOKEN = "gemini_token"
+        const val CLAUDE_TOKEN = "claude_token"
+        const val OPENAI_TOKEN = "openai_token"
+        const val CUSTOM_URL = "custom_url"
+        const val CUSTOM_MODEL = "custom_model"
     }
 
-    var apiKey: String?
-        get() = get(ANTHROPIC_API_KEY)
+    var activeProvider: String
+        get() = get(ACTIVE_PROVIDER) ?: "GEMINI"
+        set(value) = put(ACTIVE_PROVIDER, value)
+
+    var geminiToken: String?
+        get() = get(GEMINI_TOKEN)
         set(value) {
-            if (value.isNullOrBlank()) remove(ANTHROPIC_API_KEY) else put(ANTHROPIC_API_KEY, value)
+            if (value.isNullOrBlank()) remove(GEMINI_TOKEN) else put(GEMINI_TOKEN, value)
         }
+
+    var claudeToken: String?
+        get() = get(CLAUDE_TOKEN) ?: get(ANTHROPIC_API_KEY)
+        set(value) {
+            if (value.isNullOrBlank()) {
+                remove(CLAUDE_TOKEN)
+                remove(ANTHROPIC_API_KEY)
+            } else {
+                put(CLAUDE_TOKEN, value)
+                put(ANTHROPIC_API_KEY, value)
+            }
+        }
+
+    var openaiToken: String?
+        get() = get(OPENAI_TOKEN)
+        set(value) {
+            if (value.isNullOrBlank()) remove(OPENAI_TOKEN) else put(OPENAI_TOKEN, value)
+        }
+
+    var customUrl: String?
+        get() = get(CUSTOM_URL)
+        set(value) {
+            if (value.isNullOrBlank()) remove(CUSTOM_URL) else put(CUSTOM_URL, value)
+        }
+
+    var customModel: String?
+        get() = get(CUSTOM_MODEL)
+        set(value) {
+            if (value.isNullOrBlank()) remove(CUSTOM_MODEL) else put(CUSTOM_MODEL, value)
+        }
+
+    var apiKey: String?
+        get() = claudeToken
+        set(value) {
+            claudeToken = value
+        }
+
+    fun hasActiveCredentials(): Boolean = when (activeProvider) {
+        "GEMINI" -> !geminiToken.isNullOrBlank()
+        "CLAUDE" -> !claudeToken.isNullOrBlank()
+        "OPENAI" -> !openaiToken.isNullOrBlank()
+        "CUSTOM" -> true // Custom local endpoint puede no requerir token
+        else -> false
+    }
 }

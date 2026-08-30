@@ -44,6 +44,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.termdroid.agent.AutonomyMode
+import com.termdroid.agent.LlmProvider
 
 /** El chat con el agente. */
 @Composable
@@ -65,15 +66,21 @@ fun ChatScreen(vm: AgentViewModel, modifier: Modifier = Modifier) {
 
     Column(modifier = modifier.fillMaxSize().imePadding().navigationBarsPadding()) {
 
-        if (state.needsApiKey) {
-            ApiKeyPrompt(onSave = vm::saveApiKey)
-            return@Column
+        if (state.needsApiKey || state.showSettings) {
+            ProviderAuthPrompt(
+                activeProvider = state.activeProvider,
+                onSave = vm::saveProvider,
+                onDismiss = if (state.showSettings && !state.needsApiKey) { { vm.toggleSettings(false) } } else null,
+            )
+            if (state.needsApiKey) return@Column
         }
 
         AutonomyBar(
             mode = state.autonomy,
+            provider = state.activeProvider,
             onMode = vm::setAutonomy,
             onNueva = vm::nuevaSesion,
+            onOpenSettings = { vm.toggleSettings(true) },
             tokensIn = state.tokensIn,
             tokensOut = state.tokensOut,
             cacheRead = state.cacheRead,
@@ -314,8 +321,10 @@ internal fun ApprovalCard(pending: PendingApproval, onDecide: (Boolean) -> Unit)
 @Composable
 private fun AutonomyBar(
     mode: AutonomyMode,
+    provider: LlmProvider,
     onMode: (AutonomyMode) -> Unit,
     onNueva: () -> Unit,
+    onOpenSettings: () -> Unit,
     tokensIn: Long,
     tokensOut: Long,
     cacheRead: Long,
@@ -328,6 +337,7 @@ private fun AutonomyBar(
     ) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.horizontalScroll(rememberScrollState()),
         ) {
             AutonomyMode.entries.forEach { m ->
@@ -342,6 +352,11 @@ private fun AutonomyBar(
                     label = { Text(label, fontSize = 12.sp) },
                 )
             }
+            FilterChip(
+                selected = false,
+                onClick = onOpenSettings,
+                label = { Text("⚡ ${provider.displayName}", fontSize = 12.sp, fontWeight = FontWeight.SemiBold) },
+            )
             TextButton(onClick = onNueva) { Text(androidx.compose.ui.res.stringResource(R.string.nueva_sesion), fontSize = 12.sp) }
         }
         Text(
@@ -352,21 +367,130 @@ private fun AutonomyBar(
 }
 
 @Composable
-private fun ApiKeyPrompt(onSave: (String) -> Unit) {
-    var key by remember { mutableStateOf("") }
-    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(androidx.compose.ui.res.stringResource(R.string.api_key_titulo), style = MaterialTheme.typography.titleMedium)
-        Text(
-            androidx.compose.ui.res.stringResource(R.string.api_key_explicacion),
-            style = MaterialTheme.typography.bodySmall,
-        )
-        TextField(
-            value = key,
-            onValueChange = { key = it },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            placeholder = { Text("sk-ant-…") },
-        )
-        Button(onClick = { onSave(key) }, enabled = key.isNotBlank()) { Text(androidx.compose.ui.res.stringResource(R.string.api_key_guardar)) }
+private fun ProviderAuthPrompt(
+    activeProvider: LlmProvider,
+    onSave: (LlmProvider, String, String, String) -> Unit,
+    onDismiss: (() -> Unit)? = null,
+) {
+    var selectedProvider by remember { mutableStateOf(activeProvider) }
+    var token by remember { mutableStateOf("") }
+    var model by remember { mutableStateOf("") }
+    var baseUrl by remember { mutableStateOf("") }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    androidx.compose.ui.res.stringResource(R.string.proveedor_titulo),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                if (onDismiss != null) {
+                    TextButton(onClick = onDismiss) { Text(androidx.compose.ui.res.stringResource(R.string.cancelar)) }
+                }
+            }
+
+            Text(
+                androidx.compose.ui.res.stringResource(R.string.proveedor_explicacion),
+                style = MaterialTheme.typography.bodySmall,
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                LlmProvider.entries.forEach { p ->
+                    FilterChip(
+                        selected = p == selectedProvider,
+                        onClick = { selectedProvider = p },
+                        label = { Text(p.displayName, fontSize = 12.sp) },
+                    )
+                }
+            }
+
+            val ayuda = when (selectedProvider) {
+                LlmProvider.GEMINI -> androidx.compose.ui.res.stringResource(R.string.proveedor_gemini_ayuda)
+                LlmProvider.CLAUDE -> androidx.compose.ui.res.stringResource(R.string.proveedor_claude_ayuda)
+                LlmProvider.OPENAI -> androidx.compose.ui.res.stringResource(R.string.proveedor_openai_ayuda)
+                LlmProvider.CUSTOM -> androidx.compose.ui.res.stringResource(R.string.proveedor_custom_ayuda)
+            }
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    ayuda,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(8.dp),
+                )
+            }
+
+            if (selectedProvider == LlmProvider.CUSTOM) {
+                TextField(
+                    value = baseUrl,
+                    onValueChange = { baseUrl = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text(androidx.compose.ui.res.stringResource(R.string.url_servidor)) },
+                    placeholder = { Text("http://192.168.1.50:11434/v1") },
+                    singleLine = true,
+                )
+                TextField(
+                    value = model,
+                    onValueChange = { model = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text(androidx.compose.ui.res.stringResource(R.string.modelo_label)) },
+                    placeholder = { Text("llama3.2") },
+                    singleLine = true,
+                )
+                TextField(
+                    value = token,
+                    onValueChange = { token = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Token / API Key (opcional)") },
+                    singleLine = true,
+                )
+            } else {
+                TextField(
+                    value = token,
+                    onValueChange = { token = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text(androidx.compose.ui.res.stringResource(R.string.token_label)) },
+                    placeholder = {
+                        Text(
+                            when (selectedProvider) {
+                                LlmProvider.GEMINI -> "Token de Google o AIzaSy..."
+                                LlmProvider.CLAUDE -> "Token de sesión Claude o sk-ant-..."
+                                LlmProvider.OPENAI -> "Token de sesión ChatGPT o sk-..."
+                                else -> androidx.compose.ui.res.stringResource(R.string.token_placeholder)
+                            },
+                        )
+                    },
+                    singleLine = true,
+                )
+            }
+
+            Button(
+                onClick = { onSave(selectedProvider, token, model, baseUrl) },
+                enabled = selectedProvider == LlmProvider.CUSTOM || token.isNotBlank(),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(androidx.compose.ui.res.stringResource(R.string.guardar_proveedor))
+            }
+        }
     }
 }

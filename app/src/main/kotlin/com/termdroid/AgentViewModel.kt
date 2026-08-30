@@ -12,13 +12,16 @@ import com.termdroid.agent.AgentLoop
 import com.termdroid.agent.AutonomyMode
 import com.termdroid.agent.Block
 import com.termdroid.agent.ClaudeTransport
+import com.termdroid.agent.LlmProvider
 import com.termdroid.agent.MessageCodec
 import com.termdroid.agent.Msg
+import com.termdroid.agent.ProviderConfig
 import com.termdroid.agent.Role
 import com.termdroid.agent.SessionMeta
 import com.termdroid.agent.SessionStore
 import com.termdroid.agent.StoredSession
 import com.termdroid.agent.ToolRegistry
+import com.termdroid.agent.TransportFactory
 import com.termdroid.core.SecretStore
 import com.termdroid.exec.ExecEnvironment
 import com.termdroid.probe.CapabilityProbe
@@ -65,6 +68,8 @@ data class ChatState(
     val accessNeeded: SpecialAccess? = null,
     val prefill: String? = null,
     val needsApiKey: Boolean = true,
+    val activeProvider: LlmProvider = LlmProvider.GEMINI,
+    val showSettings: Boolean = false,
     val caps: DeviceCapabilities? = null,
     val tokensIn: Long = 0,
     val tokensOut: Long = 0,
@@ -96,8 +101,16 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         val caps = CapabilityProbe(app).get()
-        _state.update { it.copy(caps = caps, needsApiKey = !secrets.has(API_KEY)) }
-        if (secrets.has(API_KEY)) buildLoop(caps)
+        val currentProvider = runCatching { LlmProvider.valueOf(secrets.activeProvider) }.getOrElse { LlmProvider.GEMINI }
+        val hasCreds = secrets.hasActiveCredentials()
+        _state.update {
+            it.copy(
+                caps = caps,
+                needsApiKey = !hasCreds,
+                activeProvider = currentProvider,
+            )
+        }
+        if (hasCreds) buildLoop(caps)
         restoreLastSession()
         app.registerReceiver(
             cancelReceiver,
@@ -177,12 +190,41 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(items = emptyList(), tokensIn = 0, tokensOut = 0, cacheRead = 0) }
     }
 
-    fun saveApiKey(key: String) {
-        secrets.apiKey = key.trim()
+    fun saveProvider(
+        provider: LlmProvider,
+        token: String,
+        model: String = "",
+        baseUrl: String = "",
+    ) {
+        secrets.activeProvider = provider.name
+        when (provider) {
+            LlmProvider.GEMINI -> secrets.geminiToken = token.trim()
+            LlmProvider.CLAUDE -> secrets.claudeToken = token.trim()
+            LlmProvider.OPENAI -> secrets.openaiToken = token.trim()
+            LlmProvider.CUSTOM -> {
+                secrets.customUrl = baseUrl.trim()
+                secrets.customModel = model.trim()
+                if (token.isNotBlank()) secrets.openaiToken = token.trim()
+            }
+        }
         val caps = _state.value.caps ?: return
         buildLoop(caps)
         sessions.load(sessionId)?.let { loop?.restore(it.messages) }
-        _state.update { it.copy(needsApiKey = false) }
+        _state.update {
+            it.copy(
+                needsApiKey = !secrets.hasActiveCredentials(),
+                activeProvider = provider,
+                showSettings = false,
+            )
+        }
+    }
+
+    fun saveApiKey(key: String) {
+        saveProvider(LlmProvider.CLAUDE, key)
+    }
+
+    fun toggleSettings(show: Boolean) {
+        _state.update { it.copy(showSettings = show) }
     }
 
     fun dismissAccessPrompt() = _state.update { it.copy(accessNeeded = null) }
@@ -197,7 +239,29 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun buildLoop(caps: DeviceCapabilities) {
-        val key = secrets.apiKey ?: return
+        val provider = runCatching { LlmProvider.valueOf(secrets.activeProvider) }.getOrElse { LlmProvider.GEMINI }
+        val token = when (provider) {
+            LlmProvider.GEMINI -> secrets.geminiToken.orEmpty()
+            LlmProvider.CLAUDE -> secrets.claudeToken.orEmpty()
+            LlmProvider.OPENAI -> secrets.openaiToken.orEmpty()
+            LlmProvider.CUSTOM -> secrets.openaiToken.orEmpty()
+        }
+        val model = when (provider) {
+            LlmProvider.CUSTOM -> secrets.customModel.orEmpty()
+            else -> ""
+        }
+        val baseUrl = when (provider) {
+            LlmProvider.CUSTOM -> secrets.customUrl.orEmpty()
+            else -> ""
+        }
+
+        val config = ProviderConfig(
+            provider = provider,
+            token = token,
+            model = model,
+            baseUrl = baseUrl,
+        )
+
         val env = ExecEnvironment(getApplication())
         val tools = UnixToolset(env, caps.backend, workspace).all() +
             AndroidToolset(getApplication()) { access ->
@@ -205,7 +269,7 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
             }.all()
 
         loop = AgentLoop(
-            transport = ClaudeTransport(key),
+            transport = TransportFactory.create(config),
             tools = ToolRegistry(tools),
             systemPrompt = systemPrompt(caps),
             volatileContext = ::estadoActual,

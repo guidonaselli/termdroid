@@ -29,11 +29,19 @@ class ClaudeTransport(
     private val model: String = DEFAULT_MODEL,
     private val maxTokens: Long = DEFAULT_MAX_TOKENS,
     private val effort: OutputConfig.Effort = OutputConfig.Effort.XHIGH,
+    baseUrl: String = "",
 ) : Transport {
 
-    private val client: AnthropicClient = AnthropicOkHttpClient.builder()
-        .apiKey(apiKey)
-        .build()
+    private val client: AnthropicClient = AnthropicOkHttpClient.builder().apply {
+        if (apiKey.startsWith("sk-ant-")) {
+            apiKey(apiKey)
+        } else {
+            authToken(apiKey)
+        }
+        if (baseUrl.isNotBlank()) {
+            baseUrl(baseUrl)
+        }
+    }.build()
 
     override fun stream(
         system: String,
