@@ -68,9 +68,9 @@ object AgentCliServer {
                     val env = ExecEnvironment(app)
                     val prefix = env.prefix
                     val cacheDir = app.cacheDir
-                    NodeInstaller.installBootstrap(prefix, cacheDir) { p ->
+                    NodeInstaller.installFullEnvironment(prefix, cacheDir) { p ->
                         val b64 = Base64.encodeToString(p.toByteArray(), Base64.NO_WRAP)
-                        writer.println("T:$b64\n")
+                        writer.println("T:$b64")
                     }
                     writer.println("D:")
                     return

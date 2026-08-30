@@ -16,7 +16,8 @@ class VtParser(private val buffer: TerminalBuffer) {
     private val osc = StringBuilder()
 
     fun feed(bytes: ByteArray, length: Int = bytes.size) {
-        for (i in 0 until length) feed(bytes[i].toInt().and(0xFF).toChar())
+        val text = String(bytes, 0, length, Charsets.UTF_8)
+        text.forEach { feed(it) }
     }
 
     fun feed(text: String) = text.forEach { feed(it) }

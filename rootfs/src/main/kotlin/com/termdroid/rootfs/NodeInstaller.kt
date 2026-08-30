@@ -1,6 +1,5 @@
 package com.termdroid.rootfs
 
-import android.content.Context
 import android.os.Build
 import android.system.Os
 import kotlinx.coroutines.Dispatchers
@@ -13,13 +12,15 @@ import java.net.URL
 import java.util.zip.ZipInputStream
 
 /**
- * Instalador nativo del entorno base de paquetes Unix, Node.js y los CLIs oficiales
- * (@anthropic-ai/claude-code, @openai/codex).
+ * Instalador nativo del entorno base de paquetes Unix, Node.js y los CLIs oficiales.
  */
 object NodeInstaller {
 
     private const val BOOTSTRAP_BASE_URL =
         "https://github.com/termux/termux-packages/releases/latest/download"
+
+    private const val NODE_DEB_BASE_URL =
+        "https://packages.termux.dev/apt/termux-main/pool/main/n/nodejs"
 
     fun isNodeInstalled(prefix: File): Boolean {
         val nodeBin = File(prefix, "bin/node")
@@ -40,10 +41,9 @@ object NodeInstaller {
     }
 
     /**
-     * Descarga y descomprime el bootstrap base (bash, apt, pkg, curl, tar)
-     * en `$PREFIX` (/data/data/com.termdroid/files/usr).
+     * Descarga e instala el bootstrap base y Node.js de forma directa y deterministica.
      */
-    suspend fun installBootstrap(
+    suspend fun installFullEnvironment(
         prefix: File,
         cacheDir: File,
         onProgress: (String) -> Unit = {},
@@ -53,23 +53,90 @@ object NodeInstaller {
             val zipUrl = "$BOOTSTRAP_BASE_URL/bootstrap-$arch.zip"
             val targetZip = File(cacheDir, "bootstrap-$arch.zip")
 
-            onProgress("📦 Descargando sistema base ($arch)...")
+            onProgress("Descargando sistema base ($arch)...")
+            var lastReportedPct = -1
             downloadFile(zipUrl, targetZip) { pct ->
-                onProgress("📦 Descargando sistema base ($arch): $pct%")
+                if (pct % 25 == 0 && pct != lastReportedPct) {
+                    lastReportedPct = pct
+                    onProgress("Descargando sistema base: $pct%")
+                }
             }
 
-            onProgress("📂 Extrayendo paquetes base en $prefix...")
+            onProgress("Extrayendo paquetes base...")
             prefix.mkdirs()
             unzip(targetZip, prefix)
             targetZip.delete()
 
-            onProgress("🔗 Configurando enlaces simbolicos (symlinks)...")
+            onProgress("Configurando symlinks y permisos...")
             applySymlinks(prefix)
-
-            onProgress("🔑 Configurando permisos ejecutables...")
             setPermissions(prefix)
 
-            onProgress("✅ Sistema base instalado con exito.")
+            // Descargar e instalar Node.js directamente
+            onProgress("Descargando Node.js oficial...")
+            val nodeDebName = if (arch == "aarch64") "nodejs_26.4.0-1_aarch64.deb" else "nodejs_26.4.0-1_x86_64.deb"
+            val nodeDebUrl = "$NODE_DEB_BASE_URL/$nodeDebName"
+            val targetDeb = File(cacheDir, nodeDebName)
+
+            runCatching {
+                downloadFile(nodeDebUrl, targetDeb) { pct ->
+                    if (pct % 50 == 0) onProgress("Descargando Node.js: $pct%")
+                }
+
+                onProgress("Desempaquetando Node.js...")
+                val extractDir = File(cacheDir, "node_extracted").apply { mkdirs() }
+                val dpkgBin = File(prefix, "bin/dpkg-deb").takeIf { it.exists() } ?: File(prefix, "bin/dpkg")
+                if (dpkgBin.exists()) {
+                    val p = ProcessBuilder(
+                        dpkgBin.absolutePath,
+                        "-x",
+                        targetDeb.absolutePath,
+                        extractDir.absolutePath
+                    ).apply {
+                        environment()["LD_LIBRARY_PATH"] = File(prefix, "lib").absolutePath
+                    }.start()
+                    p.waitFor()
+
+                    // Mover archivos desde data/data/com.termux/files/usr hacia prefix
+                    val unpackedUsr = File(extractDir, "data/data/com.termux/files/usr")
+                    if (unpackedUsr.exists()) {
+                        unpackedUsr.walkTopDown().forEach { f ->
+                            val rel = f.relativeTo(unpackedUsr).path
+                            if (rel.isNotBlank()) {
+                                val dest = File(prefix, rel)
+                                if (f.isDirectory) {
+                                    dest.mkdirs()
+                                } else {
+                                    dest.parentFile?.mkdirs()
+                                    f.copyTo(dest, overwrite = true)
+                                }
+                            }
+                        }
+                    }
+                }
+                targetDeb.delete()
+                extractDir.deleteRecursively()
+            }
+
+            // Asegurar symlinks de npm y permisos de node
+            val nodeBin = File(prefix, "bin/node")
+            if (nodeBin.exists()) {
+                nodeBin.setExecutable(true, false)
+                val npmCli = File(prefix, "lib/node_modules/npm/bin/npm-cli.js")
+                val npmBin = File(prefix, "bin/npm")
+                if (npmCli.exists() && !npmBin.exists()) {
+                    npmBin.writeText("#!/system/bin/sh\nexec \"${nodeBin.absolutePath}\" \"${npmCli.absolutePath}\" \"$@\"\n")
+                    npmBin.setExecutable(true, false)
+                }
+                val npxCli = File(prefix, "lib/node_modules/npm/bin/npx-cli.js")
+                val npxBin = File(prefix, "bin/npx")
+                if (npxCli.exists() && !npxBin.exists()) {
+                    npxBin.writeText("#!/system/bin/sh\nexec \"${nodeBin.absolutePath}\" \"${npxCli.absolutePath}\" \"$@\"\n")
+                    npxBin.setExecutable(true, false)
+                }
+            }
+
+            setPermissions(prefix)
+            onProgress("Sistema base y Node.js instalados correctamente.")
         }
     }
 
@@ -93,7 +160,6 @@ object NodeInstaller {
         conn.setRequestProperty("User-Agent", "Termdroid-Installer/1.0")
 
         var responseCode = conn.responseCode
-        // Seguir redirecciones 301/302/307/308 de GitHub Releases
         var redirects = 0
         while (responseCode in 300..399 && redirects < 5) {
             val newUrl = conn.getHeaderField("Location") ?: break

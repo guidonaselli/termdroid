@@ -279,23 +279,17 @@ static int run_install(void) {
     }
     close(sock);
 
-    printf("\n⚙️ Instalando Node.js, npm, git y CLIs oficiales...\n");
+    printf("\n⚙️ Instalando CLIs oficiales de Claude y OpenAI...\n");
     const char *prefix = getenv("PREFIX");
     if (!prefix) prefix = "/data/data/com.termdroid/files/usr";
 
     char cmd[1024];
-    snprintf(cmd, sizeof(cmd), "export PATH=\"%s/bin:$PATH\" && export LD_LIBRARY_PATH=\"%s/lib:$LD_LIBRARY_PATH\" && pkg update -y 2>/dev/null || apt-get update -y 2>/dev/null", prefix, prefix);
-    system(cmd);
-
-    snprintf(cmd, sizeof(cmd), "export PATH=\"%s/bin:$PATH\" && export LD_LIBRARY_PATH=\"%s/lib:$LD_LIBRARY_PATH\" && pkg install -y nodejs git 2>/dev/null || apt-get install -y nodejs git 2>/dev/null", prefix, prefix);
-    system(cmd);
-
-    snprintf(cmd, sizeof(cmd), "export PATH=\"%s/bin:$PATH\" && export LD_LIBRARY_PATH=\"%s/lib:$LD_LIBRARY_PATH\" && npm install -g @anthropic-ai/claude-code @openai/codex 2>/dev/null", prefix, prefix);
+    snprintf(cmd, sizeof(cmd), "export PATH=\"%s/bin:$PATH\" && export LD_LIBRARY_PATH=\"%s/lib:$LD_LIBRARY_PATH\" && export NODE_PATH=\"%s/lib/node_modules\" && npm install -g @anthropic-ai/claude-code @openai/codex", prefix, prefix, prefix);
     system(cmd);
 
     printf("\n===========================================\n");
     printf("✅ ¡Instalacion completada!\n");
-    printf("Ya podes ejecutar 'claude' o 'codex' directamente.\n");
+    printf("Escribe 'claude' o 'codex' para iniciar sesion.\n");
     printf("===========================================\n");
     return 0;
 }
