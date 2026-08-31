@@ -107,6 +107,36 @@ object NodeInstaller {
         apt-get update
         apt-get install -y nodejs npm git ca-certificates
         npm install -g @anthropic-ai/claude-code @openai/codex
+        if [ ! -e /root/CLAUDE.md ]; then
+            cat > /root/CLAUDE.md <<'GUIDE'
+        # Termdroid
+
+        Este entorno ejecuta las herramientas oficiales dentro de Debian.
+        Trabajá desde tu directorio personal y guardá los proyectos en carpetas separadas.
+
+        ## Inicio rápido
+
+        - pwd confirma el directorio actual.
+        - mkdir -p proyectos/nombre && cd proyectos/nombre crea un proyecto.
+        - claude y codex abren las sesiones oficiales.
+        - Volvé a Termdroid para comprobar versiones o reconfigurar el entorno.
+
+        ## Seguridad
+
+        No pegues claves ni tokens en archivos del proyecto. Revisá los comandos que modifiquen o eliminen archivos antes de ejecutarlos.
+        GUIDE
+        fi
+        if [ ! -e /root/AGENTS.md ]; then
+            cat > /root/AGENTS.md <<'GUIDE'
+        # Entorno Termdroid
+
+        - Usá el directorio actual como alcance de trabajo.
+        - Preferí cambios pequeños y verificables.
+        - No leas ni expongas secretos.
+        - Pedí confirmación antes de borrar datos o modificar recursos fuera del proyecto.
+        - Ejecutá las comprobaciones relevantes después de cada cambio.
+        GUIDE
+        fi
         node --version
         npm --version
         claude --version

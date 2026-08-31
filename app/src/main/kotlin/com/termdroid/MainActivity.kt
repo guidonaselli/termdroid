@@ -138,7 +138,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private companion object {
-        const val OFFICIAL_CLI_REVISION = 2
+        const val OFFICIAL_CLI_REVISION = 3
     }
 
     override fun onNewIntent(intent: android.content.Intent) {
