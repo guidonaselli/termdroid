@@ -12,8 +12,8 @@ android {
         applicationId = "com.termdroid"
         minSdk = 26
         targetSdk = 28
-        versionCode = 7
-        versionName = "0.1.7"
+        versionCode = 8
+        versionName = "0.1.8"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64")

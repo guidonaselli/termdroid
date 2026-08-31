@@ -2,14 +2,19 @@ package com.termdroid.rootfs
 
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 object NodeInstaller {
+    private val installMutex = Mutex()
+
     suspend fun installFullEnvironment(
         context: Context,
         onProgress: (String) -> Unit = {},
     ): Result<Unit> = withContext(Dispatchers.IO) {
-        runCatching {
+        installMutex.withLock {
+            runCatching {
             check(TermuxCommandRunner.isInstalled(context)) {
                 "Instalá Termux, abrilo una vez y configurá allow-external-apps=true."
             }
@@ -26,6 +31,7 @@ object NodeInstaller {
             )
             check(validation.exitCode == 0) { validation.error.ifBlank { validation.stderr.ifBlank { validation.stdout } } }
             onProgress("CLIs oficiales instalados en Termux.")
+            }
         }
     }
 
