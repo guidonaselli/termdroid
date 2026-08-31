@@ -5,12 +5,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -23,6 +28,7 @@ fun OfficialCliOnboarding(
     onRefresh: () -> Unit,
     onOpenClaude: () -> Unit,
     onOpenCodex: () -> Unit,
+    onRemoveEnvironment: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -67,6 +73,7 @@ fun OfficialCliOnboarding(
                 onRefresh = onRefresh,
                 onOpenClaude = onOpenClaude,
                 onOpenCodex = onOpenCodex,
+                onRemoveEnvironment = onRemoveEnvironment,
             )
         }
     }
@@ -107,7 +114,9 @@ private fun ReadyTools(
     onRefresh: () -> Unit,
     onOpenClaude: () -> Unit,
     onOpenCodex: () -> Unit,
+    onRemoveEnvironment: () -> Unit,
 ) {
+    var showRemovalConfirmation by remember { mutableStateOf(false) }
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
         Column(
             modifier = Modifier.padding(20.dp),
@@ -133,6 +142,30 @@ private fun ReadyTools(
     }
     OutlinedButton(onClick = onRefresh, modifier = Modifier.fillMaxWidth()) {
         Text("Comprobar de nuevo")
+    }
+    OutlinedButton(onClick = { showRemovalConfirmation = true }, modifier = Modifier.fillMaxWidth()) {
+        Text("Eliminar entorno de Termux")
+    }
+    if (showRemovalConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showRemovalConfirmation = false },
+            title = { Text("Eliminar entorno de Termdroid") },
+            text = {
+                Text(
+                    "Se eliminarán sólo el Debian aislado, registros y estado administrados por Termdroid. " +
+                        "Termux, tus proyectos y otros entornos no se tocarán. Hacelo antes de desinstalar Termdroid.",
+                )
+            },
+            confirmButton = {
+                Button(onClick = {
+                    showRemovalConfirmation = false
+                    onRemoveEnvironment()
+                }) { Text("Eliminar") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showRemovalConfirmation = false }) { Text("Cancelar") }
+            },
+        )
     }
 }
 

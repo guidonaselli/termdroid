@@ -62,7 +62,7 @@ object TermuxCommandRunner {
 
     fun openCli(context: Context, command: String, arguments: List<String> = emptyList()): Result<Unit> = runCatching {
         checkReady(context)
-        context.startService(commandIntent(arrayOf("-lc", "exec ${'$'}PREFIX/bin/proot-distro login debian -- $command \"${'$'}@\"", "--") + arguments, false))
+        context.startService(commandIntent(arrayOf("-lc", "exec ${'$'}PREFIX/bin/proot-distro login termdroid -- $command \"${'$'}@\"", "--") + arguments, false))
         context.startActivity(
             Intent().setClassName(TERMUX_PACKAGE, "com.termux.app.TermuxActivity")
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),

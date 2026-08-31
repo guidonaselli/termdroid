@@ -65,6 +65,7 @@ class MainActivity : ComponentActivity() {
                                 onRefresh = ::refreshOfficialCli,
                                 onOpenClaude = { openOfficialCli("claude") },
                                 onOpenCodex = { openOfficialCli("codex") },
+                                onRemoveEnvironment = ::removeOfficialCli,
                                 modifier = Modifier.fillMaxSize(),
                             )
                             1 -> ChatScreen(agent, Modifier.fillMaxSize())
@@ -131,6 +132,23 @@ class MainActivity : ComponentActivity() {
             .onFailure(::showSetupFailure)
     }
 
+    private fun removeOfficialCli() {
+        lifecycleScope.launch {
+            officialCliState = OfficialCliSetupState.Preparing("Eliminando el entorno administrado de Termux...")
+            NodeInstaller.removeManagedEnvironment(this@MainActivity)
+                .onSuccess {
+                    getSharedPreferences("termdroid", MODE_PRIVATE)
+                        .edit()
+                        .remove("official_cli_revision")
+                        .apply()
+                    officialCliState = OfficialCliSetupState.ActionRequired(
+                        "El entorno administrado fue eliminado. Termux y sus demás datos no se modificaron.",
+                    )
+                }
+                .onFailure(::showSetupFailure)
+        }
+    }
+
     private fun showSetupFailure(error: Throwable) {
         officialCliState = OfficialCliSetupState.Failed(
             error.message.orEmpty().ifBlank { "No se pudo completar la configuración. Reintentá desde Termdroid." },
@@ -138,7 +156,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private companion object {
-        const val OFFICIAL_CLI_REVISION = 3
+        const val OFFICIAL_CLI_REVISION = 4
     }
 
     override fun onNewIntent(intent: android.content.Intent) {

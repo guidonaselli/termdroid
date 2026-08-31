@@ -13,8 +13,15 @@ data class OfficialCliVersions(
     val codex: String,
 )
 
+enum class ManagedTermuxEnvironment {
+    PRESENT,
+    ABSENT,
+    LEGACY,
+}
+
 object NodeInstaller {
     private val installMutex = Mutex()
+    private const val MANAGED_DISTRO = "termdroid"
 
     suspend fun installFullEnvironment(
         context: Context,
@@ -45,9 +52,43 @@ object NodeInstaller {
             }
             val validation = TermuxCommandRunner.run(context, validationScript)
             check(validation.exitCode == 0) {
-                validation.error.ifBlank { validation.stderr.ifBlank { validation.stdout } }
+                validation.error.ifBlank { validation.stderr.ifBlank { validation.stdout } }.ifBlank {
+                    "El entorno aislado de Termdroid no está listo. Configuralo de nuevo desde esta pantalla."
+                }
             }
             parseVersions(validation.stdout)
+        }
+    }
+
+    suspend fun managedEnvironment(context: Context): Result<ManagedTermuxEnvironment> = withContext(Dispatchers.IO) {
+        runCatching {
+            check(TermuxCommandRunner.isInstalled(context)) { "Termux no está instalado." }
+            check(TermuxCommandRunner.hasPermission(context)) {
+                "Permití que Termdroid ejecute comandos en Termux."
+            }
+            when (TermuxCommandRunner.run(context, environmentScript).stdout.trim()) {
+                "managed" -> ManagedTermuxEnvironment.PRESENT
+                "legacy" -> ManagedTermuxEnvironment.LEGACY
+                else -> ManagedTermuxEnvironment.ABSENT
+            }
+        }
+    }
+
+    suspend fun removeManagedEnvironment(context: Context): Result<Unit> = withContext(Dispatchers.IO) {
+        installMutex.withLock {
+            runCatching {
+                check(TermuxCommandRunner.isInstalled(context)) { "Termux no está instalado." }
+                check(TermuxCommandRunner.hasPermission(context)) {
+                    "Permití que Termdroid ejecute comandos en Termux."
+                }
+                val cleanup = TermuxCommandRunner.run(context, cleanupScript)
+                check(cleanup.exitCode == 0) {
+                    cleanup.error.ifBlank { cleanup.stderr.ifBlank { cleanup.stdout } }
+                }
+                check(managedEnvironment(context).getOrThrow() != ManagedTermuxEnvironment.PRESENT) {
+                    "No se pudo verificar la eliminación del entorno administrado."
+                }
+            }
         }
     }
 
@@ -69,12 +110,37 @@ object NodeInstaller {
 
     private val validationScript = """
         set -eu
-        proot-distro login debian -- /bin/bash -lc '
+        proot-distro login $MANAGED_DISTRO -- /bin/bash -lc '
+            test -f /root/.termdroid-managed
             printf "node=%s\n" "$(node --version)"
             printf "npm=%s\n" "$(npm --version)"
             printf "claude=%s\n" "$(claude --version)"
             printf "codex=%s\n" "$(codex --version)"
         '
+    """.trimIndent()
+
+    private val environmentScript = """
+        set -u
+        if proot-distro login $MANAGED_DISTRO -- /bin/sh -c 'test -f /root/.termdroid-managed' >/dev/null 2>&1; then
+            printf 'managed\n'
+        elif proot-distro login debian -- /bin/true >/dev/null 2>&1; then
+            printf 'legacy\n'
+        else
+            printf 'absent\n'
+        fi
+    """.trimIndent()
+
+    private val cleanupScript = """
+        set -eu
+        if ! proot-distro login $MANAGED_DISTRO -- /bin/sh -c 'test -f /root/.termdroid-managed' >/dev/null 2>&1; then
+            echo 'No hay un entorno administrado por Termdroid para eliminar.' >&2
+            exit 3
+        fi
+        proot-distro remove $MANAGED_DISTRO
+        rm -rf "${'$'}HOME/.termdroid"
+        rm -f "${'$'}HOME/.termdroid-debian-setup.sh" "${'$'}HOME/.termdroid-install.log"
+        rm -f "${'$'}PREFIX/etc/proot-distro/$MANAGED_DISTRO.override.sh"
+        test ! -d "${'$'}PREFIX/var/lib/proot-distro/installed-rootfs/$MANAGED_DISTRO"
     """.trimIndent()
 
     private val VERSION_KEYS = setOf("node", "npm", "claude", "codex")
@@ -98,12 +164,17 @@ object NodeInstaller {
         exec >"${'$'}log" 2>&1
         apt-get update
         apt-get install -y proot-distro
-        if ! proot-distro login debian -- /bin/true; then
-            proot-distro install debian
+        if ! proot-distro login $MANAGED_DISTRO -- /bin/true; then
+            if [ -e "${'$'}PREFIX/etc/proot-distro/$MANAGED_DISTRO.override.sh" ]; then
+                echo "El nombre de entorno Termdroid ya existe en Termux. Eliminá ese entorno desde Termdroid antes de reintentar." >&2
+                exit 1
+            fi
+            proot-distro install --override-alias $MANAGED_DISTRO debian
         fi
         cat > "${'$'}HOME/.termdroid-debian-setup.sh" <<'EOF'
         set -eu
         export DEBIAN_FRONTEND=noninteractive
+        touch /root/.termdroid-managed
         apt-get update
         apt-get install -y nodejs npm git ca-certificates
         npm install -g @anthropic-ai/claude-code @openai/codex
@@ -142,15 +213,7 @@ object NodeInstaller {
         claude --version
         codex --version
         EOF
-        proot-distro login debian --bind "${'$'}HOME:/mnt/termdroid" -- /bin/bash /mnt/termdroid/.termdroid-debian-setup.sh
-        cat > "${'$'}PREFIX/bin/claude" <<'EOF'
-        #!/data/data/com.termux/files/usr/bin/bash
-        exec "${'$'}PREFIX/bin/proot-distro" login debian -- claude "${'$'}@"
-        EOF
-        cat > "${'$'}PREFIX/bin/codex" <<'EOF'
-        #!/data/data/com.termux/files/usr/bin/bash
-        exec "${'$'}PREFIX/bin/proot-distro" login debian -- codex "${'$'}@"
-        EOF
-        chmod 700 "${'$'}PREFIX/bin/claude" "${'$'}PREFIX/bin/codex"
+        mkdir -p "${'$'}HOME/.termdroid"
+        proot-distro login $MANAGED_DISTRO --bind "${'$'}HOME:/mnt/termdroid" -- /bin/bash /mnt/termdroid/.termdroid-debian-setup.sh
     """.trimIndent()
 }

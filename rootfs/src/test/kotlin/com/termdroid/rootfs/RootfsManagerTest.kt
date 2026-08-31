@@ -103,13 +103,16 @@ class RootfsManagerTest {
         val script = NodeInstaller.setupScript
 
         assertTrue(script.contains("apt-get install -y proot-distro"))
-        assertTrue(script.contains("if ! proot-distro login debian"))
+        assertTrue(script.contains("if ! proot-distro login termdroid"))
+        assertTrue(script.contains("proot-distro install --override-alias termdroid debian"))
         assertTrue(script.contains("npm install -g @anthropic-ai/claude-code @openai/codex"))
+        assertTrue(script.contains("touch /root/.termdroid-managed"))
         assertTrue(script.contains("if [ ! -e /root/CLAUDE.md ]"))
         assertTrue(script.contains("if [ ! -e /root/AGENTS.md ]"))
         assertTrue(script.contains("Este entorno ejecuta las herramientas oficiales dentro de Debian."))
-        assertTrue(script.contains("""cat > "${'$'}PREFIX/bin/claude""""))
-        assertTrue(script.contains("""proot-distro" login debian -- claude"""))
+        assertFalse(script.contains("""cat > "${'$'}PREFIX/bin/claude""""))
+        assertTrue(script.contains("mkdir -p \"${'$'}HOME/.termdroid\""))
+        assertTrue(script.contains("${'$'}HOME/.termdroid-install.log"))
         assertTrue(script.contains("claude --version"))
         assertTrue(script.contains("codex --version"))
     }
