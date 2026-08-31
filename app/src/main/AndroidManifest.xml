@@ -9,12 +9,14 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="com.termux.permission.RUN_COMMAND" />
 
     <uses-permission
         android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
 
     <queries>
+        <package android:name="com.termux" />
         <intent>
             <action android:name="android.speech.RecognitionService" />
         </intent>
@@ -55,6 +57,10 @@
             android:name=".AgentService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <receiver
+            android:name="com.termdroid.rootfs.TermuxCommandResultReceiver"
+            android:exported="false" />
 
         <service
             android:name="com.termdroid.tools.android.TermdroidNotificationListener"

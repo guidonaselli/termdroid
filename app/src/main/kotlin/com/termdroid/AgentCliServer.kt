@@ -14,6 +14,7 @@ import com.termdroid.core.SecretStore
 import com.termdroid.exec.ExecEnvironment
 import com.termdroid.probe.CapabilityProbe
 import com.termdroid.rootfs.NodeInstaller
+import com.termdroid.rootfs.TermuxCommandRunner
 import com.termdroid.tools.android.AndroidToolset
 import com.termdroid.tools.unix.UnixToolset
 import kotlinx.coroutines.CoroutineScope
@@ -65,14 +66,29 @@ object AgentCliServer {
                 val line = reader.readLine() ?: return
 
                 if (line.startsWith("INSTALL")) {
-                    val env = ExecEnvironment(app)
-                    val prefix = env.prefix
-                    val cacheDir = app.cacheDir
-                    val result = NodeInstaller.installFullEnvironment(prefix, cacheDir) { p ->
+                    val result = NodeInstaller.installFullEnvironment(app) { p ->
                         val b64 = Base64.encodeToString(p.toByteArray(), Base64.NO_WRAP)
                         writer.println("T:$b64")
                     }
                     result.exceptionOrNull()?.let { writer.println("E:${it.message ?: "Fallo desconocido"}") }
+                    writer.println("D:")
+                    return
+                }
+
+                if (line.startsWith("TERMUX ")) {
+                    val parts = line.removePrefix("TERMUX ").split(" ").filter { it.isNotBlank() }
+                    val command = when (parts.firstOrNull()?.uppercase()) {
+                        "CLAUDE" -> "claude"
+                        "CODEX", "OPENAI" -> "codex"
+                        else -> null
+                    }
+                    if (command == null) {
+                        writer.println("E:CLI oficial no reconocido.")
+                    } else {
+                        TermuxCommandRunner.openCli(app, command, parts.drop(1))
+                            .onSuccess { writer.println("T:${Base64.encodeToString("Se abrió Termux con $command.".toByteArray(), Base64.NO_WRAP)}") }
+                            .onFailure { writer.println("E:${it.message ?: "No se pudo abrir Termux."}") }
+                    }
                     writer.println("D:")
                     return
                 }

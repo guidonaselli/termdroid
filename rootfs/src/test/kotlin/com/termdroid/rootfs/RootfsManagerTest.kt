@@ -52,17 +52,8 @@ class RootfsManagerTest {
     fun instalaWrapperDeClaude() {
         val claude = manager.installClaudeWrapper()
         assertTrue(claude.exists())
-        assertFalse(manager.hasClaude)
         assertTrue(claude.readText().contains("claude"))
         assertFalse(claude.readText().contains("exec \"${manager.binDir.absolutePath}/claude\""))
-    }
-
-    @Test
-    fun wrappersNoCuentanComoRuntimeInstalado() {
-        manager.ensureBaseEnvironment()
-
-        assertFalse(manager.hasNode)
-        assertFalse(manager.hasClaude)
     }
 
     @Test
@@ -101,12 +92,21 @@ class RootfsManagerTest {
     }
 
     @Test
-    fun aceptaRaizYDescendientesPeroRechazaTraversal() {
-        val target = tempFolder.newFolder("rootfs")
+    fun informaRequisitosDeTermux() {
+        assertTrue(TermuxCommandRunner.readinessError(false, false)?.contains("no esta instalado") == true)
+        assertTrue(TermuxCommandRunner.readinessError(true, false)?.contains("permiso") == true)
+        assertEquals(null, TermuxCommandRunner.readinessError(true, true))
+    }
 
-        assertTrue(NodeInstaller.isSafeTarEntry(target, File(target, "./")))
-        assertTrue(NodeInstaller.isSafeTarEntry(target, File(target, "etc/passwd")))
-        assertFalse(NodeInstaller.isSafeTarEntry(target, File(target, "../escape")))
+    @Test
+    fun scriptOficialEsReintentableYValidaLasHerramientas() {
+        val script = NodeInstaller.setupScript
+
+        assertTrue(script.contains("apt-get install -y proot-distro"))
+        assertTrue(script.contains("if ! proot-distro login debian"))
+        assertTrue(script.contains("npm install -g @anthropic-ai/claude-code @openai/codex"))
+        assertTrue(script.contains("claude --version"))
+        assertTrue(script.contains("codex --version"))
     }
 
     @Test

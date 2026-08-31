@@ -8,6 +8,7 @@ import androidx.activity.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
@@ -19,10 +20,15 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import com.termdroid.rootfs.NodeInstaller
+import com.termdroid.rootfs.TermuxCommandRunner
+import kotlinx.coroutines.launch
 
 /** Cero friccion: el primer frame util es el chat. */
 class MainActivity : ComponentActivity() {
@@ -31,17 +37,28 @@ class MainActivity : ComponentActivity() {
 
     private val terminal: TerminalViewModel by viewModels()
 
+    private var setupStatus by mutableStateOf<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         sharedTextOf(intent)?.let(agent::prefill)
         AgentCliServer.start(this, lifecycleScope)
+        provisionOfficialCli()
 
         setContent {
             TermdroidTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { inner ->
                     Column(Modifier.padding(inner)) {
                         var tab by remember { mutableIntStateOf(0) }
+                        setupStatus?.let { status ->
+                            androidx.compose.material3.Surface(
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text(status, modifier = Modifier.padding(12.dp))
+                            }
+                        }
 
                         PrimaryTabRow(selectedTabIndex = tab) {
                             Tab(tab == 0, onClick = {
@@ -56,6 +73,33 @@ class MainActivity : ComponentActivity() {
                             else -> TerminalScreen(terminal, Modifier.fillMaxSize())
                         }
                     }
+                }
+            }
+        }
+    }
+
+    private fun provisionOfficialCli() {
+        val preferences = getSharedPreferences("termdroid", MODE_PRIVATE)
+        if (preferences.getBoolean("official_cli_ready", false)) return
+
+        when {
+            !TermuxCommandRunner.isInstalled(this) -> {
+                setupStatus = "Instalá y abrí Termux para activar Claude Code y Codex oficiales."
+            }
+            !TermuxCommandRunner.hasPermission(this) -> {
+                setupStatus = "Permití que Termdroid ejecute comandos en Termux para completar la configuración."
+            }
+            else -> lifecycleScope.launch {
+                setupStatus = "Preparando Claude Code y Codex oficiales…"
+                val result = NodeInstaller.installFullEnvironment(this@MainActivity) { progress ->
+                    runOnUiThread { setupStatus = progress }
+                }
+                result.onSuccess {
+                    preferences.edit().putBoolean("official_cli_ready", true).apply()
+                    setupStatus = "Claude Code y Codex están listos. Abrí Terminal para iniciar sesión."
+                }.onFailure {
+                    val cause = it.message.orEmpty().ifBlank { "revisá Termux y reintentá desde Terminal." }
+                    setupStatus = "La configuración no terminó: $cause"
                 }
             }
         }

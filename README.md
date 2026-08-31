@@ -1,6 +1,6 @@
 # Termdroid 🤖📱
 
-> **Native AI Agent & PTY Terminal for Android** — Zero-friction mobile agent, full Unix terminal emulator, Node.js toolchain, and local ADB device management.
+> **Native AI Agent & PTY Terminal for Android** — Agente móvil, terminal Unix y CLI oficiales de Claude Code y Codex mediante Termux.
 
 ---
 
@@ -9,7 +9,7 @@
 **Termdroid** brings powerful AI coding and automation tools directly to your Android phone without needing a cloud VM or remote desktop.
 
 It provides two parallel workflows that do not compete:
-1. **Interactive Terminal (CLI)**: Run `@anthropic-ai/claude-code` or `codex` directly inside an interactive PTY shell. Authenticate via your regular browser with Claude Pro/Team OAuth without paying per API token.
+1. **Official CLI in Termux**: Termdroid opens the installed `claude` and `codex` CLIs in a visible Termux session, where their official login flows authenticate your Claude or ChatGPT subscription.
 2. **Native Mobile Agent (Chat)**: A fast, battery-efficient mobile assistant with rich interactive tool cards, diff previews, speech dictation, and Android system tools.
 
 ---
@@ -52,6 +52,10 @@ Termdroid is fully bilingual out of the box:
 
 ### Prerequisites
 - Android 8.0+ (API 26+)
+- [Termux](https://github.com/termux/termux-app/releases) instalado desde su release oficial y abierto una vez
+- En Termux, habilitar una sola vez los comandos externos: `mkdir -p ~/.termux && echo allow-external-apps=true >> ~/.termux/termux.properties && termux-reload-settings`
+- Autorizar a Termdroid el permiso de Termux **Run commands**
+- Al abrir Termdroid, instala y valida automáticamente Debian, Node.js, npm, Claude Code y Codex; la primera instalación requiere conexión y espacio libre.
 - Recommended: Android 11+ for Wireless Debugging loopback (`shell_priv`)
 
 ### Building from Source
@@ -83,7 +87,7 @@ adb install -r app/build/outputs/apk/debug/app-universal-debug.apk
 :app           ──> UI Compose (Chat, Terminal, Quick Settings, Service)
 :agent         ──> Autonomous agent loop, tool dispatch & approval state machine
 :terminal      ──> ANSI/VT parser, terminal buffer grid, PTY session wrapper
-:rootfs        ──> Unix environment manager, Node.js & Claude CLI wrappers
+:rootfs        ──> Unix environment manager and Termux official-CLI delegation
 :exec          ──> Native PTY fork & dynamic linker executor (C++ / bionic)
 :probe         ──> Dynamic device capability probe (SELinux / W^X / Linker)
 :adb           ──> Embedded loopback ADB client & RSA authentication

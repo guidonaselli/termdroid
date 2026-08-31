@@ -157,6 +157,46 @@ static int execute_query(const char *provider, const char *prompt) {
     return 0;
 }
 
+static int run_termux_cli(const char *provider, int argc, char **argv, int arg_start) {
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0) return 1;
+    struct sockaddr_in server_addr;
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(SERVER_PORT);
+    inet_pton(AF_INET, "127.0.0.1", &server_addr.sin_addr);
+    if (connect(sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+        fprintf(stderr, "Termdroid debe estar abierto para iniciar Termux.\n");
+        close(sock);
+        return 1;
+    }
+    const char *name = strcmp(provider, "OPENAI") == 0 ? "CODEX" : "CLAUDE";
+    char command[BUFFER_SIZE];
+    snprintf(command, sizeof(command), "TERMUX %s", name);
+    for (int i = arg_start; i < argc; i++) {
+        strncat(command, " ", sizeof(command) - strlen(command) - 1);
+        strncat(command, argv[i], sizeof(command) - strlen(command) - 1);
+    }
+    strncat(command, "\n", sizeof(command) - strlen(command) - 1);
+    send(sock, command, strlen(command), 0);
+    char buffer[BUFFER_SIZE];
+    char line[BUFFER_SIZE];
+    int index = 0, failed = 0, read_count;
+    while ((read_count = recv(sock, buffer, sizeof(buffer), 0)) > 0) {
+        for (int i = 0; i < read_count; i++) {
+            if (buffer[i] == '\n') {
+                line[index] = '\0';
+                if (strncmp(line, "T:", 2) == 0) { b64_decode_print(line + 2); printf("\n"); }
+                if (strncmp(line, "E:", 2) == 0) { fprintf(stderr, "%s\n", line + 2); failed = 1; }
+                index = 0;
+            } else if (index < BUFFER_SIZE - 1) {
+                line[index++] = buffer[i];
+            }
+        }
+    }
+    close(sock);
+    return failed;
+}
 static void run_login(const char *provider) {
     const char *home = getenv("HOME");
     if (!home) home = "/data/data/com.termdroid/files/home";
@@ -323,6 +363,13 @@ int main(int argc, char **argv) {
         cli_title = "🔵 Gemini / AGY CLI";
         color = "34;1";
         prompt_prefix = "\033[34;1magy>\033[0m ";
+    }
+
+    if (strcmp(provider, "CLAUDE") == 0 || strcmp(provider, "OPENAI") == 0) {
+        if (argc > arg_start && (strcmp(argv[arg_start], "install") == 0 || strcmp(argv[arg_start], "setup") == 0 || strcmp(argv[arg_start], "setup-node") == 0)) {
+            return run_install();
+        }
+        return run_termux_cli(provider, argc, argv, arg_start);
     }
 
     if (argc > arg_start && (strcmp(argv[arg_start], "login") == 0 || strcmp(argv[arg_start], "auth") == 0)) {

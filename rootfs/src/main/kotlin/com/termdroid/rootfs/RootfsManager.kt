@@ -30,8 +30,6 @@ class RootfsManager(
     val tmpDir: File get() = File(prefix, "tmp")
 
     val isBaseInstalled: Boolean get() = File(binDir, "termdroid").exists()
-    val hasNode: Boolean get() = File(prefix, "alpine/usr/bin/node").exists()
-    val hasClaude: Boolean get() = File(prefix, "alpine/usr/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe").exists()
 
     /** Inicializa la estructura base del entorno Unix dentro del directorio privado. */
     fun ensureBaseEnvironment(): Boolean {
@@ -175,26 +173,10 @@ class RootfsManager(
             export PS1='termdroid:\w\$ '
 
             claude() {
-                if [ -f "${prefix.absolutePath}/bin/claude" ]; then
-                    "${prefix.absolutePath}/bin/claude" "${'$'}@"
-                elif [ -f "${prefix.absolutePath}/alpine/usr/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe" ]; then
-                    "${prefix.absolutePath}/bin/node" "${prefix.absolutePath}/alpine/usr/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe" "${'$'}@"
-                elif [ -f "${nativeLibDir.absolutePath}/libtdcli.so" ]; then
-                    "${nativeLibDir.absolutePath}/libtdcli.so" claude "${'$'}@"
-                else
-                    sh "${binDir.absolutePath}/claude" "${'$'}@"
-                fi
+                "${nativeLibDir.absolutePath}/libtdcli.so" claude "${'$'}@"
             }
             codex() {
-                if [ -f "${prefix.absolutePath}/bin/codex" ]; then
-                    "${prefix.absolutePath}/bin/codex" "${'$'}@"
-                elif [ -f "${prefix.absolutePath}/alpine/usr/lib/node_modules/@openai/codex/bin/codex.js" ]; then
-                    "${prefix.absolutePath}/bin/node" "${prefix.absolutePath}/alpine/usr/lib/node_modules/@openai/codex/bin/codex.js" "${'$'}@"
-                elif [ -f "${nativeLibDir.absolutePath}/libtdcli.so" ]; then
-                    "${nativeLibDir.absolutePath}/libtdcli.so" codex "${'$'}@"
-                else
-                    sh "${binDir.absolutePath}/codex" "${'$'}@"
-                fi
+                "${nativeLibDir.absolutePath}/libtdcli.so" codex "${'$'}@"
             }
             agy() {
                 if [ -f "${nativeLibDir.absolutePath}/libtdcli.so" ]; then
@@ -208,20 +190,6 @@ class RootfsManager(
                     "${nativeLibDir.absolutePath}/libtdcli.so" gemini "${'$'}@"
                 else
                     sh "${binDir.absolutePath}/gemini" "${'$'}@"
-                fi
-            }
-            node() {
-                if [ -f "${prefix.absolutePath}/bin/node" ]; then
-                    "${prefix.absolutePath}/bin/node" "${'$'}@"
-                else
-                    echo "Node.js no esta instalado. Ejecuta 'setup-environment' para instalarlo."
-                fi
-            }
-            npm() {
-                if [ -f "${prefix.absolutePath}/bin/npm" ]; then
-                    "${prefix.absolutePath}/bin/npm" "${'$'}@"
-                else
-                    echo "npm no esta instalado. Ejecuta 'setup-environment' para instalarlo."
                 fi
             }
             termdroid() {
@@ -297,13 +265,7 @@ class RootfsManager(
             export HOME="${homeDir.absolutePath}"
             export PATH="${prefix.absolutePath}/bin:${binDir.absolutePath}:${nativeLibDir.absolutePath}:/system/bin:/system/xbin"
 
-            if [ -f "${prefix.absolutePath}/alpine/usr/lib/node_modules/@openai/codex/bin/codex.js" ]; then
-                exec "${prefix.absolutePath}/bin/node" "${prefix.absolutePath}/alpine/usr/lib/node_modules/@openai/codex/bin/codex.js" "${'$'}@"
-            elif [ -f "${nativeLibDir.absolutePath}/libtdcli.so" ]; then
-                exec "${nativeLibDir.absolutePath}/libtdcli.so" codex "${'$'}@"
-            else
-                echo "Termdroid CLI inicializando..."
-            fi
+            exec "${nativeLibDir.absolutePath}/libtdcli.so" codex "${'$'}@"
         """.trimIndent() + "\n"
         codexBin.writeText(script)
         codexBin.setExecutable(true, false)
@@ -339,7 +301,6 @@ class RootfsManager(
         }.getOrDefault(false)
     }
 
-    /** Instala o actualiza el wrapper de Claude Code CLI apuntando a npx / node. */
     fun installClaudeWrapper(): File {
         binDir.mkdirs()
         val claudeBin = File(binDir, "claude")
@@ -349,13 +310,7 @@ class RootfsManager(
             export HOME="${homeDir.absolutePath}"
             export PATH="${prefix.absolutePath}/bin:${binDir.absolutePath}:${nativeLibDir.absolutePath}:/system/bin:/system/xbin"
 
-            if [ -f "${prefix.absolutePath}/alpine/usr/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe" ]; then
-                exec "${prefix.absolutePath}/bin/node" "${prefix.absolutePath}/alpine/usr/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe" "${'$'}@"
-            elif [ -f "${nativeLibDir.absolutePath}/libtdcli.so" ]; then
-                exec "${nativeLibDir.absolutePath}/libtdcli.so" claude "${'$'}@"
-            else
-                echo "Termdroid CLI inicializando..."
-            fi
+            exec "${nativeLibDir.absolutePath}/libtdcli.so" claude "${'$'}@"
         """.trimIndent() + "\n"
 
         claudeBin.writeText(script)
