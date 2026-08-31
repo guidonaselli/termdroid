@@ -112,6 +112,23 @@ class RootfsManagerTest {
     }
 
     @Test
+    fun interpretaLasVersionesOficialesValidadas() {
+        val versions = NodeInstaller.parseVersions(
+            """
+            node=v20.19.2
+            npm=9.2.0
+            claude=2.1.251 (Claude Code)
+            codex=codex-cli 0.151.0
+            """.trimIndent(),
+        )
+
+        assertEquals("v20.19.2", versions.node)
+        assertEquals("9.2.0", versions.npm)
+        assertEquals("2.1.251 (Claude Code)", versions.claude)
+        assertEquals("codex-cli 0.151.0", versions.codex)
+    }
+
+    @Test
     fun inicializaWrappersDeHardware() {
         manager.ensureBaseEnvironment()
         assertTrue(File(manager.binDir, "termdroid-clipboard").exists())

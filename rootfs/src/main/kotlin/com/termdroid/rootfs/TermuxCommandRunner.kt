@@ -23,6 +23,7 @@ object TermuxCommandRunner {
     private const val EXTRA_ARGUMENTS = "com.termux.RUN_COMMAND_ARGUMENTS"
     private const val EXTRA_WORKDIR = "com.termux.RUN_COMMAND_WORKDIR"
     private const val EXTRA_BACKGROUND = "com.termux.RUN_COMMAND_BACKGROUND"
+    private const val EXTRA_SESSION_ACTION = "com.termux.RUN_COMMAND_SESSION_ACTION"
     private const val EXTRA_PENDING_INTENT = "com.termux.RUN_COMMAND_PENDING_INTENT"
     private const val EXTRA_RESULT_BUNDLE = "result"
     private const val EXTRA_STDOUT = "stdout"
@@ -62,9 +63,13 @@ object TermuxCommandRunner {
     fun openCli(context: Context, command: String, arguments: List<String> = emptyList()): Result<Unit> = runCatching {
         checkReady(context)
         context.startService(commandIntent(arrayOf("-lc", "exec ${'$'}PREFIX/bin/proot-distro login debian -- $command \"${'$'}@\"", "--") + arguments, false))
+        context.startActivity(
+            Intent().setClassName(TERMUX_PACKAGE, "com.termux.app.TermuxActivity")
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
     }
 
-    internal fun readinessError(installed: Boolean, permissionGranted: Boolean): String? = when {
+    fun readinessError(installed: Boolean, permissionGranted: Boolean): String? = when {
         !installed -> "Termux no esta instalado. Instala Termux y completá su configuración inicial."
         !permissionGranted -> "Termdroid no tiene permiso para ejecutar comandos en Termux."
         else -> null
@@ -80,6 +85,7 @@ object TermuxCommandRunner {
         putExtra(EXTRA_ARGUMENTS, arguments)
         putExtra(EXTRA_WORKDIR, "/data/data/com.termux/files/home")
         putExtra(EXTRA_BACKGROUND, background)
+        if (!background) putExtra(EXTRA_SESSION_ACTION, "0")
     }
 
     internal fun deliver(requestId: Int, intent: Intent) {

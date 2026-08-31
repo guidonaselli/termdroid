@@ -6,34 +6,78 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
+data class OfficialCliVersions(
+    val node: String,
+    val npm: String,
+    val claude: String,
+    val codex: String,
+)
+
 object NodeInstaller {
     private val installMutex = Mutex()
 
     suspend fun installFullEnvironment(
         context: Context,
         onProgress: (String) -> Unit = {},
-    ): Result<Unit> = withContext(Dispatchers.IO) {
+    ): Result<OfficialCliVersions> = withContext(Dispatchers.IO) {
         installMutex.withLock {
             runCatching {
-            check(TermuxCommandRunner.isInstalled(context)) {
-                "Instalá Termux, abrilo una vez y configurá allow-external-apps=true."
-            }
-            check(TermuxCommandRunner.hasPermission(context)) {
-                "Otorgá a Termdroid el permiso de ejecutar comandos en Termux."
-            }
-            onProgress("Preparando el entorno oficial de Termux...")
-            val install = TermuxCommandRunner.run(context, setupScript)
-            check(install.exitCode == 0) { install.error.ifBlank { install.stderr.ifBlank { install.stdout } } }
-            onProgress("Validando Node.js, npm, Claude Code y Codex en Termux...")
-            val validation = TermuxCommandRunner.run(
-                context,
-                "set -eu; proot-distro login debian -- /bin/bash -lc 'node --version; npm --version; claude --version; codex --version'",
-            )
-            check(validation.exitCode == 0) { validation.error.ifBlank { validation.stderr.ifBlank { validation.stdout } } }
-            onProgress("CLIs oficiales instalados en Termux.")
+                check(TermuxCommandRunner.isInstalled(context)) {
+                    "Instalá Termux, abrilo una vez y configurá allow-external-apps=true."
+                }
+                check(TermuxCommandRunner.hasPermission(context)) {
+                    "Otorgá a Termdroid el permiso de ejecutar comandos en Termux."
+                }
+                onProgress("Preparando el entorno oficial de Termux...")
+                val install = TermuxCommandRunner.run(context, setupScript)
+                check(install.exitCode == 0) { install.error.ifBlank { install.stderr.ifBlank { install.stdout } } }
+                onProgress("Validando Node.js, npm, Claude Code y Codex...")
+                checkEnvironment(context).getOrThrow()
             }
         }
     }
+
+    suspend fun checkEnvironment(context: Context): Result<OfficialCliVersions> = withContext(Dispatchers.IO) {
+        runCatching {
+            check(TermuxCommandRunner.isInstalled(context)) { "Termux no está instalado." }
+            check(TermuxCommandRunner.hasPermission(context)) {
+                "Permití que Termdroid ejecute comandos en Termux."
+            }
+            val validation = TermuxCommandRunner.run(context, validationScript)
+            check(validation.exitCode == 0) {
+                validation.error.ifBlank { validation.stderr.ifBlank { validation.stdout } }
+            }
+            parseVersions(validation.stdout)
+        }
+    }
+
+    internal fun parseVersions(output: String): OfficialCliVersions {
+        val versions = output.lineSequence()
+            .mapNotNull { line ->
+                line.substringBefore("=", "").takeIf { it in VERSION_KEYS }
+                    ?.let { key -> key to line.substringAfter("=", "").trim() }
+            }
+            .toMap()
+
+        return OfficialCliVersions(
+            node = versions.getValue("node").also { check(it.isNotBlank()) },
+            npm = versions.getValue("npm").also { check(it.isNotBlank()) },
+            claude = versions.getValue("claude").also { check(it.isNotBlank()) },
+            codex = versions.getValue("codex").also { check(it.isNotBlank()) },
+        )
+    }
+
+    private val validationScript = """
+        set -eu
+        proot-distro login debian -- /bin/bash -lc '
+            printf "node=%s\n" "$(node --version)"
+            printf "npm=%s\n" "$(npm --version)"
+            printf "claude=%s\n" "$(claude --version)"
+            printf "codex=%s\n" "$(codex --version)"
+        '
+    """.trimIndent()
+
+    private val VERSION_KEYS = setOf("node", "npm", "claude", "codex")
 
     internal fun installEnvironment(
         prepare: () -> Unit,
