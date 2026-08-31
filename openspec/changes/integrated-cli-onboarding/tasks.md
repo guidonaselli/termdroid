@@ -12,4 +12,4 @@
 
 - [x] 3.1 Ejecutar tests y ensamblar un APK release, verificando que el build termina correctamente
 - [x] 3.2 Probar por ADB los estados listo y de apertura de ambos CLI en arm64, verificando salida y pantalla real
-- [ ] 3.3 Publicar un tag y comprobar CI, assets y checksums de la release
+- [x] 3.3 Publicar un tag y comprobar CI, assets y checksums de la release
