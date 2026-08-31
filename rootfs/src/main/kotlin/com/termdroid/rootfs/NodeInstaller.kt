@@ -69,5 +69,14 @@ object NodeInstaller {
         codex --version
         EOF
         proot-distro login debian --bind "${'$'}HOME:/mnt/termdroid" -- /bin/bash /mnt/termdroid/.termdroid-debian-setup.sh
+        cat > "${'$'}PREFIX/bin/claude" <<'EOF'
+        #!/data/data/com.termux/files/usr/bin/bash
+        exec "${'$'}PREFIX/bin/proot-distro" login debian -- claude "${'$'}@"
+        EOF
+        cat > "${'$'}PREFIX/bin/codex" <<'EOF'
+        #!/data/data/com.termux/files/usr/bin/bash
+        exec "${'$'}PREFIX/bin/proot-distro" login debian -- codex "${'$'}@"
+        EOF
+        chmod 700 "${'$'}PREFIX/bin/claude" "${'$'}PREFIX/bin/codex"
     """.trimIndent()
 }

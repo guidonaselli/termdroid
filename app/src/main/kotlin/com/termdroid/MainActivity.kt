@@ -80,7 +80,7 @@ class MainActivity : ComponentActivity() {
 
     private fun provisionOfficialCli() {
         val preferences = getSharedPreferences("termdroid", MODE_PRIVATE)
-        if (preferences.getBoolean("official_cli_ready", false)) return
+        if (preferences.getInt("official_cli_revision", 0) >= OFFICIAL_CLI_REVISION) return
 
         when {
             !TermuxCommandRunner.isInstalled(this) -> {
@@ -95,7 +95,7 @@ class MainActivity : ComponentActivity() {
                     runOnUiThread { setupStatus = progress }
                 }
                 result.onSuccess {
-                    preferences.edit().putBoolean("official_cli_ready", true).apply()
+                    preferences.edit().putInt("official_cli_revision", OFFICIAL_CLI_REVISION).apply()
                     setupStatus = "Claude Code y Codex están listos. Abrí Terminal para iniciar sesión."
                 }.onFailure {
                     val cause = it.message.orEmpty().ifBlank { "revisá Termux y reintentá desde Terminal." }
@@ -103,6 +103,10 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private companion object {
+        const val OFFICIAL_CLI_REVISION = 2
     }
 
     override fun onNewIntent(intent: android.content.Intent) {

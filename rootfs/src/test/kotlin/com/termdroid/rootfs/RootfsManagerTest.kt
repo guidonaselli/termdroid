@@ -105,6 +105,8 @@ class RootfsManagerTest {
         assertTrue(script.contains("apt-get install -y proot-distro"))
         assertTrue(script.contains("if ! proot-distro login debian"))
         assertTrue(script.contains("npm install -g @anthropic-ai/claude-code @openai/codex"))
+        assertTrue(script.contains("""cat > "${'$'}PREFIX/bin/claude""""))
+        assertTrue(script.contains("""proot-distro" login debian -- claude"""))
         assertTrue(script.contains("claude --version"))
         assertTrue(script.contains("codex --version"))
     }
