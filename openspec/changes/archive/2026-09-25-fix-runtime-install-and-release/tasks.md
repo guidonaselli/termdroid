@@ -19,5 +19,5 @@
 ## 4. Verificación integral
 
 - [x] 4.1 Ejecutar tests unitarios y builds debug/release locales, verificando que se generan APKs arm64-v8a, x86_64, universal y AAB
-- [ ] 4.2 Ejecutar el flujo completo por ADB en un dispositivo arm64-v8a y verificar versiones de Node, npm, Claude y Codex
+- [ ] 4.2 [manual] Ejecutar el flujo completo por ADB en un dispositivo arm64-v8a y verificar versiones de Node, npm, Claude y Codex
 - [x] 4.3 Publicar un tag nuevo y verificar que la pipeline queda verde y la release contiene los cinco artefactos con checksums válidos

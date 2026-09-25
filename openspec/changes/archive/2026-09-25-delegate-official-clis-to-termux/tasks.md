@@ -14,5 +14,5 @@
 
 - [x] 3.1 Añadir pruebas unitarias para estados de Termux ausente, permiso pendiente, éxito y error delegado
 - [x] 3.2 Ejecutar build y tests locales, verificando que no quedan assets del runtime experimental
-- [ ] 3.3 Probar por ADB en arm64: instalación real, cuatro versiones y `claude login`/`codex login` en Termux
+- [ ] 3.3 [manual] Probar por ADB en arm64: instalación real, cuatro versiones y `claude login`/`codex login` en Termux
 - [x] 3.4 Publicar un tag nuevo y validar pipeline, assets y checksums

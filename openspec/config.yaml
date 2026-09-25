@@ -1,4 +1,4 @@
-schema: spec-driven
+schema: lmd-lite
 
 context: |
   Language: es
